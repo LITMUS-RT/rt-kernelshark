@@ -150,17 +150,6 @@ static void update_tree_view_filters(struct shark_info *info,
 
 /* graph callbacks */
 
-/* convert_nano() and print_time() are copied from trace-graph.c for debugging
-   purposes, and should be deleted when this is complete (or merged with
-   trace-graph.c */
-
-static void convert_nano(unsigned long long time, unsigned long *sec,
-			 unsigned long *usec)
-{
-	*sec = time / 1000000000ULL;
-	*usec = (time / 1000) % 1000000;
-}
-
 static void print_time(unsigned long long time)
 {
 	unsigned long sec, usec;
@@ -1292,10 +1281,10 @@ plot_rt_tasks_clicked (gpointer data)
 
 	rtinfo = &ginfo->rtinfo;
 	tasks = task_list_pids(rtinfo->tasks);
-	rt_plot_task_plotted(rtinfo, &selected);
+	rt_plot_task_plotted(ginfo, &selected);
 
 	trace_task_dialog(ginfo->handle, tasks, selected,
-			  rt_plot_task_update_callback, rtinfo);
+			  rt_plot_task_update_callback, ginfo);
 	free(tasks);
 	free(selected);
 }

@@ -27,6 +27,7 @@
 #include "trace-xml.h"
 #include "task-list.h"
 #include "rt-graph.h"
+#include "trace-plot-task.h"
 
 struct graph_info;
 
@@ -389,14 +390,26 @@ void graph_plot_cpus_update_callback(gboolean accept,
 				     guint64 *selected_cpu_mask,
 				     gpointer data);
 
-/* task plot */
-void graph_plot_task(struct graph_info *ginfo, int pid, int pos);
-void graph_plot_task_update_callback(gboolean accept,
-				     gint *selected,
-				     gint *non_select,
-				     gpointer data);
-void graph_plot_task_plotted(struct graph_info *ginfo,
-			     gint **plotted);
+static inline void convert_nano(unsigned long long time, unsigned long *sec,
+				unsigned long *usec)
+{
+	*sec = time / 1000000000ULL;
+	*usec = (time / 1000) % 1000000;
+}
+
+static inline gint hash_pid(gint val)
+{
+	/* idle always gets black */
+	if (!val)
+		return 0;
+	return trace_hash(val);
+}
+
+static inline int hash_cpu(int cpu)
+{
+	cpu = (cpu << 3) + cpu * 21;
+	return trace_hash(cpu);
+}
 
 
 #endif /* _TRACE_GRAPH_H */

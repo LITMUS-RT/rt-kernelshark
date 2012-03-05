@@ -1,0 +1,225 @@
+
+Can't do this until cpus set up!
+
+0. Load all events w/ proper stuff
+
+1. Create list of rt_tasks
+2. Create seperate dailog for rt tasks w/ a callback.
+3. Allow dialog to be filtered.
+4. Create dummy task thing that just says hi.
+5. Make it print out when it reads stuff.
+6. Draw shit
+7. Draw new shit.
+
+
+struct trace-graph.h {
+ /* - header file for generic graphers */
+
+/*  - What is returned for drawing */
+/*  struct plot_info; */
+
+/*  - what you can customize */
+/*  struct plot_callbacks; */
+/*   - customized in trace-*-plot.c */
+
+/*  - one of these per trace-*-plot instantiation */
+/*  struct graph_plot; */
+/*   void* private is per trace-*-plot */
+/*   *cb (callbacks) is the callbacks */
+
+
+/*  struct graph_callbacks; */
+/*  struct plot_list; */
+/*  struct plot_hash; */
+
+/*  /\* Current state of the displayed graph AS A WHOLE *\/ */
+  struct graph_info {
+    handle; /* input handle */
+  };
+
+/*  - create with trace_graph_plot_insert */
+
+};
+
+struct parse-events.h {
+  /* Can write shit into it person by person */
+  struct trace_seq;
+};
+
+struct unknown {
+
+};
+
+struct trace-graph.c {
+
+};
+
+/* trace-graph.c */
+ 
+
+
+struct trace-plot-task.c {
+
+  /*** PRIVATE DATA ***/
+
+  /* Private to each task plot */
+  struct task_plot_info {
+    pid /* per task */
+    /* Other current things, lotta last whatevs */
+  }
+
+  /*** PRIVATE METHODS ****/
+
+  /* Return true if the record (which is for this task) is a sched_switch
+   * and the data held is the previous state?? */
+  is_running(ginfo, record);
+
+  /* Return true if the record is:
+   * a sched_switch to our pid or from our pid, is_sched = TRUE
+   * a wakeup, if we are waking up, wakeup = TRUE
+   * from our pid, all fALSE
+   */
+  record_matches_pid(ginfo, record, match_pid, &pid, &sched_pid, &is_sched, &wakeup);
+
+
+  /* Sets cpu to given time. Read till that time is passed, freeing everytning
+   * on the way.
+   * If we reach a record at or past our time, set cursor to that time.
+   */
+  set_cpu_to_time(cpu, ginfo, time);
+
+  /* Call above on all cpus */
+  set_cpus_to_time(ginfo, time);
+
+  /* Return struct w/ array holding current record offset at each cpu */
+  save_offsets(ginfo);
+
+  /* Set cursor to each offset, if present. Otherwise, put at end */
+  restore_offsets(ginfo, offsets);
+
+  /* Return first record after time which is from our pid */
+  find_record(ginfo, pid, time);
+
+  /* Updates last_whatevers in task info */
+  update_last_record(ginfo, task_plot_info, record);
+
+  /* Reads backwards until it finds a matching record */
+  find_previous_record(ginfo, start_record, pid, cpu);
+
+  get_display_record(ginfo, pid, time);
+
+  /**** PUBLIC METHODS *****/
+
+  /* Basically reset as though you just started reading */
+  task_plot_start(ginfo, plot, time);
+
+  /* Load the next record for me at or after that time */
+  task_plot_match_time(ginfo, plot, time);
+
+  /* Get record at time, print info */
+  task_plot_display_last_event(info, plot, trace_seq s, time);
+
+  /* Always draws a line of the color of the pid. Always.
+   * Then update_last_record.
+   * If record is null, times up, just finish our shit and return.
+   * If was running, and now wakeup, that means another task woke up
+   *   We need to end our gd box. If it was us waking up,no box.
+   *   return.
+   * If a match
+   *   If a new cpu, see if we switched cpu. if so, create a box w/
+   *     proper color for LAST cpu, end it here.
+   *   If scheduled, but we weren't currently running, we are now.
+   *     Update the last bullshit. If we had a wake time, that means
+   *     our wakeup turned into a run. Draw an empty box where we were
+   *     awake but not running. Otherwise, reset wake time.
+   *   Else if we haven't created a new box, (ie switched cpus), we got
+   *     switched out. Create a goddamn box.
+   *   Return
+   * If no previous last_records on this cpu, put this record there.
+   * If there was a last cpu, but no match, somehow we aren't running.
+   *   Finish the box.
+   */
+  task_plot_event(ginfo, plot,r ecord, info);
+
+  /* Just frontend for find_record */
+  task_plot_find_record(ginfo, plot, time);
+
+  /* Print out event info if in current resolution */
+  task_plot_display_info(ginfo, plot, sequence s, time);
+
+  /* Free private info */
+  task_plot_destroy(info, plot);
+
+
+  /*** STATIC METHODS ***/
+
+  /* Return what tasks are plotted */
+  void graph_plot_task_plotted(ginfo, **plotted);
+
+  /* Called when task is clicked or removed */
+  graph_plot_task_update_callback(accept, selected, non_selct, data);
+
+  /* Create a plot for a single task, insert into plot */
+  graph_plot_task(ginfo, pid, pos);
+
+};
+
+struct trace-plot-cpu.c{
+  /*** DATA ***/
+  struct cpu_plot_info {
+    cpu, last_time, last_pid, *last_record;
+  };
+
+  /*** PRIVATE ***/
+  /* Hashes for pid value, but if idle (aka 0), returns black) */
+  hash_pid(val);
+
+  /* Sets cpu near time, reads until time is passed, returns last record */
+  get_record_from_time(ginfo, cpu, time);
+
+  /* Return 1 if the record should be skipped */
+  filter_record(ginfo, record, &orig_pid, &sched_pid, &sched_switch);
+
+  /* Update last_pid, last_record, and last_time */
+  update_last_record(ginfo, cpu_info, record);
+
+  /* Uh eh hrm? */
+  find_record_on_cpu(ginfo, cpu, time);
+
+
+  /*** PUBLIC ***/
+  /* Gets record around time. Return 1 if exact match */
+  cpu_plot_match_time(ginfo, plot, time);
+
+  /* Find first non-filtered event after time, write out info into s */
+  cpu_plot_display_last_event(ginfo, plot, sequence s, time);
+
+  /* Prepare for liftoff ! */
+  cpu_plot_start(ginfo, plot, time);
+
+  /* Generate stuff as needed */
+  cpu_plot_event(ginfo, plot, record, info);
+
+  /* Call find record to get a record in this time */
+  cpu_plot_find_record(ginfo, plot, time);
+
+  /* Write out info for record at or before time */
+  cpu_plot_display_info(gino, plot, s, time);
+
+  /* You get it */
+  cpu_plot_destroy(ginfo, plot);
+
+  /*** STATIC ***/
+  /* Create cpu plot, add to trace graph */
+  add_cpu_plot(ginfo, cpu);
+
+  /* Return cpus plotted in cpu_mask */
+  graph_plot_cpus_plotted(ginfo, *all_cpus, **cpu_mask);
+
+  /* Remove unselected plots, add selected plots */
+  graph_plot_cpus_update_callback(accept, all_cpus, selected_cpu_mast, data);
+
+  /* Automatigically add all cpus */
+  graph_plot_init_cpus();
+
+}

@@ -30,22 +30,6 @@ struct cpu_plot_info {
 	struct record		*last_record;
 };
 
-static gint hash_pid(gint val)
-{
-	/* idle always gets black */
-	if (!val)
-		return 0;
-
-	return trace_hash(val);
-}
-
-static void convert_nano(unsigned long long time, unsigned long *sec,
-			 unsigned long *usec)
-{
-	*sec = time / 1000000000ULL;
-	*usec = (time / 1000) % 1000000;
-}
-
 static struct record *get_record_from_time(struct graph_info *ginfo, int cpu,
 					   unsigned long long time)
 {

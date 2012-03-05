@@ -26,41 +26,7 @@
 #define RED 0xff
 #define GREEN (0xff<<16)
 
-struct task_plot_info {
-	int			pid;
-	struct cpu_data		*cpu_data;
-	struct record		**last_records;
-	unsigned long long	last_time;
-	unsigned long long	wake_time;
-	unsigned long long	display_wake_time;
-	int			wake_color;
-	int			last_cpu;
-};
-
-static void convert_nano(unsigned long long time, unsigned long *sec,
-			 unsigned long *usec)
-{
-	*sec = time / 1000000000ULL;
-	*usec = (time / 1000) % 1000000;
-}
-
-static gint hash_pid(gint val)
-{
-	/* idle always gets black */
-	if (!val)
-		return 0;
-
-	return trace_hash(val);
-}
-
-static int hash_cpu(int cpu)
-{
-	cpu = (cpu << 3) + cpu * 21;
- 
-	return trace_hash(cpu);
-}
-
-static gboolean is_running(struct graph_info *ginfo, struct record *record)
+gboolean is_running(struct graph_info *ginfo, struct record *record)
 {
 	unsigned long long val;
 	int id;
@@ -73,7 +39,7 @@ static gboolean is_running(struct graph_info *ginfo, struct record *record)
 	return val ? FALSE : TRUE;
 }
 
-static gboolean record_matches_pid(struct graph_info *ginfo,
+gboolean record_matches_pid(struct graph_info *ginfo,
 				   struct record *record, int match_pid,
 				   int *pid, int *sched_pid,
 				   gboolean *is_sched,
@@ -107,7 +73,7 @@ static gboolean record_matches_pid(struct graph_info *ginfo,
 	return FALSE;
 }
 
-static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
+void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
 {
 	struct record *record;
 
@@ -126,7 +92,7 @@ static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long lon
 		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, time);
 }
 
-static void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
+void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
 {
 	int cpu;
 
@@ -134,7 +100,7 @@ static void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
 		set_cpu_to_time(cpu, ginfo, time);
 }
 
-static int task_plot_match_time(struct graph_info *ginfo, struct graph_plot *plot,
+int task_plot_match_time(struct graph_info *ginfo, struct graph_plot *plot,
 			       unsigned long long time)
 {
 	struct task_plot_info *task_info = plot->private;
@@ -173,11 +139,7 @@ static int task_plot_match_time(struct graph_info *ginfo, struct graph_plot *plo
 	return ret;
 }
 
-struct offset_cache {
-	guint64 *offsets;
-};
-
-static struct offset_cache *save_offsets(struct graph_info *ginfo)
+struct offset_cache *save_offsets(struct graph_info *ginfo)
 {
 	struct offset_cache *offsets;
 	struct record *record;
@@ -196,7 +158,7 @@ static struct offset_cache *save_offsets(struct graph_info *ginfo)
 	return offsets;
 }
 
-static void restore_offsets(struct graph_info *ginfo, struct offset_cache *offsets)
+void restore_offsets(struct graph_info *ginfo, struct offset_cache *offsets)
 {
 	struct record *record;
 	int cpu;
@@ -215,7 +177,7 @@ static void restore_offsets(struct graph_info *ginfo, struct offset_cache *offse
 	free(offsets);
 }
 
-static struct record *
+struct record *
 find_record(struct graph_info *ginfo, gint pid, guint64 time)
 {
 	struct record *record = NULL;
@@ -245,7 +207,7 @@ find_record(struct graph_info *ginfo, gint pid, guint64 time)
 	return record;
 }
 
-static int task_plot_display_last_event(struct graph_info *ginfo,
+int task_plot_display_last_event(struct graph_info *ginfo,
 					struct graph_plot *plot,
 					struct trace_seq *s,
 					unsigned long long time)
@@ -318,7 +280,7 @@ static int task_plot_display_last_event(struct graph_info *ginfo,
 	return 1;
 }
 
-static void task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
+void task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 			    unsigned long long time)
 {
 	struct task_plot_info *task_info = plot->private;
@@ -331,7 +293,7 @@ static void task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 	task_info->display_wake_time = 0ULL;
 }
 
-static void update_last_record(struct graph_info *ginfo,
+void update_last_task_record(struct graph_info *ginfo,
 			       struct task_plot_info *task_info,
 			       struct record *record)
 {
@@ -363,7 +325,7 @@ static void update_last_record(struct graph_info *ginfo,
 			continue;
 
 		if (cpu == this_cpu) {
-			static int once;
+			int once;
 
 			trecord = tracecmd_read_prev(handle, record);
 			/* Set cpu cursor back to what it was  */
@@ -374,7 +336,7 @@ static void update_last_record(struct graph_info *ginfo,
 			}
 			free_record(saved);
 		} else {
-			static int once;
+			int once;
 
 			saved = tracecmd_read_data(handle, cpu);
 			set_cpu_to_time(cpu, ginfo, ts);
@@ -412,7 +374,7 @@ static void update_last_record(struct graph_info *ginfo,
 	}
 }
 
-static int task_plot_event(struct graph_info *ginfo,
+int task_plot_event(struct graph_info *ginfo,
 			   struct graph_plot *plot,
 			   struct record *record,
 			   struct plot_info *info)
@@ -429,7 +391,7 @@ static int task_plot_event(struct graph_info *ginfo,
 	pid = task_info->pid;
 
 	if (!record) {
-		update_last_record(ginfo, task_info, record);
+		update_last_task_record(ginfo, task_info, record);
 		/* no more records, finish a box if one was started */
 		if (task_info->last_cpu >= 0) {
 			info->box = TRUE;
@@ -468,7 +430,7 @@ static int task_plot_event(struct graph_info *ginfo,
 		 * viewable range. Search to see if one exists, and if
 		 * it is the record we want to match.
 		 */
-		update_last_record(ginfo, task_info, record);
+		update_last_task_record(ginfo, task_info, record);
 
 		if (is_wakeup) {
 			/* Wake up but not task */
@@ -555,7 +517,7 @@ static int task_plot_event(struct graph_info *ginfo,
 }
 
 
-static struct record *
+struct record *
 task_plot_find_record(struct graph_info *ginfo, struct graph_plot *plot,
 		      unsigned long long time)
 {
@@ -569,7 +531,7 @@ task_plot_find_record(struct graph_info *ginfo, struct graph_plot *plot,
 
 #define MAX_SEARCH 20
 
-static struct record *
+struct record *
 find_previous_record(struct graph_info *ginfo, struct record *start_record,
 		     int pid, int cpu)
 {
@@ -609,7 +571,7 @@ find_previous_record(struct graph_info *ginfo, struct record *start_record,
 	return record;
 }
 
-static struct record *
+struct record *
 get_display_record(struct graph_info *ginfo, int pid, unsigned long long time)
 {
 	struct record *record;
@@ -752,16 +714,10 @@ static const struct plot_callbacks task_plot_cb = {
 	.destroy		= task_plot_destroy
 };
 
-/**
- * graph_plot_task_plotted - return what tasks are plotted
- * @ginfo: the graph info structure
- * @plotted: returns an allocated array of gints holding the pids.
- *  the last pid is -1, NULL, if none are.
- *
- * @plotted must be freed with free() after this is called.
- */
-void graph_plot_task_plotted(struct graph_info *ginfo,
-			     gint **plotted)
+
+void graph_tasks_plotted(struct graph_info *ginfo,
+			 enum task_plot_type type,
+			 gint **plotted)
 {
 	struct task_plot_info *task_info;
 	struct graph_plot *plot;
@@ -778,10 +734,26 @@ void graph_plot_task_plotted(struct graph_info *ginfo,
 	}
 }
 
-void graph_plot_task_update_callback(gboolean accept,
-				     gint *selected,
-				     gint *non_select,
-				     gpointer data)
+/**
+ * graph_plot_task_plotted - return what tasks are plotted
+ * @ginfo: the graph info structure
+ * @plotted: returns an allocated array of gints holding the pids.
+ *  the last pid is -1, NULL, if none are.
+ *
+ * @plotted must be freed with free() after this is called.
+ */
+void graph_plot_task_plotted(struct graph_info *ginfo,
+			     gint **plotted)
+{
+	graph_tasks_plotted(ginfo, TASK_PLOT_LINUX, plotted);
+}
+
+void graph_tasks_update_callback(enum task_plot_type type,
+				 plot_task_cb plot_cb,
+				 gboolean accept,
+				 gint *selected,
+				 gint *non_select,
+				 gpointer data)
 {
 	struct graph_info *ginfo = data;
 	struct task_plot_info *task_info;
@@ -809,12 +781,16 @@ void graph_plot_task_update_callback(gboolean accept,
 		plot = ginfo->plot_array[i];
 		if (plot->type != PLOT_TYPE_TASK)
 			continue;
+
+		task_info = plot->private;
+		if (task_info->type != type)
+			continue;
+
 		/* If non are selected, then remove all */
 		if (!select_size) {
 			trace_graph_plot_remove(ginfo, plot);
 			continue;
 		}
-		task_info = plot->private;
 		ptr = bsearch(&task_info->pid, selected, select_size,
 			      sizeof(gint), id_cmp);
 		if (ptr) {
@@ -834,9 +810,18 @@ void graph_plot_task_update_callback(gboolean accept,
 
 	/* Now add any plots that need to be added */
 	for (i = 0; i < select_size; i++)
-		graph_plot_task(ginfo, selected[i], ginfo->plots);
+		plot_cb(ginfo, selected[i], ginfo->plots);
 
 	trace_graph_refresh(ginfo);
+}
+
+void graph_plot_task_update_callback(gboolean accept,
+				     gint *selected,
+				     gint *non_select,
+				     gpointer data)
+{
+	graph_tasks_update_callback(TASK_PLOT_LINUX, graph_plot_task,
+				    accept, selected, non_select, data);
 }
 
 void graph_plot_init_tasks(struct graph_info *ginfo)
@@ -866,6 +851,17 @@ void graph_plot_init_tasks(struct graph_info *ginfo)
 				&task_plot_cb, task_info);
 }
 
+void init_task_plot_info(struct graph_info *ginfo,
+			 struct task_plot_info *task_info,
+			 enum task_plot_type type,
+			 int pid)
+{
+	task_info->last_records =
+		malloc_or_die(sizeof(struct record *) * ginfo->cpus);
+	task_info->pid = pid;
+	task_info->type = type;
+}
+
 void graph_plot_task(struct graph_info *ginfo, int pid, int pos)
 {
 	struct task_plot_info *task_info;
@@ -875,9 +871,9 @@ void graph_plot_task(struct graph_info *ginfo, int pid, int pos)
 	int len;
 
 	task_info = malloc_or_die(sizeof(*task_info));
-	task_info->last_records =
-		malloc_or_die(sizeof(struct record *) * ginfo->cpus);
-	task_info->pid = pid;
+
+	init_task_plot_info(ginfo, task_info, TASK_PLOT_LINUX, pid);
+
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 
 	len = strlen(comm) + 100;

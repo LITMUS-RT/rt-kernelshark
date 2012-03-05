@@ -2,8 +2,9 @@
 #define _RT_GRAPH_H
 
 #include <gtk/gtk.h>
-#include "trace-cmd.h"
 #include "task-list.h"
+#include "trace-cmd.h"
+#include "rt-plot-task.h"
 
 struct rt_graph_info {
 
@@ -58,13 +59,5 @@ int rt_graph_check_task_resume(struct rt_graph_info *rtinfo, struct pevent *peve
 			       struct record *record, gint *pid,
 			       unsigned long long *when);
 void init_rt_event_cache(struct rt_graph_info *rtinfo);
-
-/* Metadata */
-void rt_plot_task_plotted(struct rt_graph_info *rt_info, gint **plotted);
-
-/* Callbacks for managing task list */
-void rt_plot_task_update_callback(gboolean accept, gint *selected,
-				  gint *non_select, gpointer data);
-void rt_plot_task_plotted(struct rt_graph_info *rtinfo, gint **plotted);
 
 #endif

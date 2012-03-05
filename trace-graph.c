@@ -70,13 +70,6 @@ static GdkGC *red;
 static void redraw_pixmap_backend(struct graph_info *ginfo);
 static void update_label_window(struct graph_info *ginfo);
 
-static void convert_nano(unsigned long long time, unsigned long *sec,
-			 unsigned long *usec)
-{
-	*sec = time / 1000000000ULL;
-	*usec = (time / 1000) % 1000000;
-}
-
 static int convert_time_to_x(struct graph_info *ginfo, guint64 time)
 {
 	if (time < ginfo->view_start_time)
