@@ -969,7 +969,7 @@ __list_tasks_clicked (struct shark_info *info,
 
 	store = TRACE_VIEW_STORE(model);
 
-	tasks = trace_graph_task_list(ginfo);
+	tasks = task_list_pids(ginfo->tasks);
 	selected = filter_task_pids(task_filter);
 
 	trace_task_dialog(info->handle, tasks, selected, func, info);
@@ -1068,7 +1068,7 @@ __graph_tasks_clicked (struct shark_info *info,
 	if (!ginfo->handle)
 		return;
 
-	tasks = trace_graph_task_list(ginfo);
+	tasks = task_list_pids(ginfo->tasks);
 	selected = filter_task_pids(task_filter);
 
 	trace_task_dialog(ginfo->handle, tasks, selected, func, info);
@@ -1268,11 +1268,34 @@ plot_tasks_clicked (gpointer data)
 	if (!ginfo->handle)
 		return;
 
-	tasks = trace_graph_task_list(ginfo);
+	tasks = task_list_pids(ginfo->tasks);
 	graph_plot_task_plotted(ginfo, &selected);
 
 	trace_task_dialog(ginfo->handle, tasks, selected,
 			  graph_plot_task_update_callback, ginfo);
+	free(tasks);
+	free(selected);
+}
+
+/* Callback for the clicked signal of the plot real-time tasks button */
+static void
+plot_rt_tasks_clicked (gpointer data)
+{
+	struct shark_info *info = data;
+	struct graph_info *ginfo = info->ginfo;
+	struct rt_graph_info *rtinfo;
+	gint *selected;
+	gint *tasks;
+
+	if (!ginfo->handle)
+		return;
+
+	rtinfo = &ginfo->rtinfo;
+	tasks = task_list_pids(rtinfo->tasks);
+	rt_plot_task_plotted(rtinfo, &selected);
+
+	trace_task_dialog(ginfo->handle, tasks, selected,
+			  rt_plot_task_update_callback, rtinfo);
 	free(tasks);
 	free(selected);
 }
@@ -2179,6 +2202,21 @@ void kernel_shark(int argc, char **argv)
 	/* We can attach the Quit menu item to our exit function */
 	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
 				  G_CALLBACK (plot_tasks_clicked),
+				  (gpointer) info);
+
+	/* We do need to show menu items */
+	gtk_widget_show(sub_item);
+
+	/* --- Plot - RT Tasks Option --- */
+
+	sub_item = gtk_menu_item_new_with_label("Real-Time Tasks");
+
+	/* Add them to the menu */
+	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+
+	/* We can attach the Quit menu item to our exit function */
+	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
+				  G_CALLBACK (plot_rt_tasks_clicked),
 				  (gpointer) info);
 
 	/* We do need to show menu items */

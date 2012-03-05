@@ -25,6 +25,7 @@
 #include "trace-cmd.h"
 #include "trace-hash.h"
 #include "trace-xml.h"
+#include "task-list.h"
 #include "rt-graph.h"
 
 struct graph_info;
@@ -146,8 +147,6 @@ struct plot_hash {
 };
 
 #define PLOT_HASH_SIZE 1024
-#define TASK_HASH_SIZE 1024
-struct task_list;
 
 struct graph_info {
 	struct tracecmd_input	*handle;
@@ -230,7 +229,7 @@ struct graph_info {
 	struct format_field	*wakeup_new_pid_field;
 	struct format_field	*wakeup_new_success_field;
 
-	struct rt_graph_info	rt_info;
+	struct rt_graph_info	rtinfo;
 
 	gboolean		read_comms;	/* Read all comms on first load */
 
@@ -308,7 +307,6 @@ gboolean trace_graph_filter_on_event(struct graph_info *ginfo, struct record *re
 void trace_graph_copy_filter(struct graph_info *ginfo,
 			     gboolean all_events,
 			     struct event_filter *event_filter);
-gint *trace_graph_task_list(struct graph_info *ginfo);
 
 int trace_graph_load_filters(struct graph_info *ginfo,
 			     struct tracecmd_xml_handle *handle);
@@ -399,5 +397,6 @@ void graph_plot_task_update_callback(gboolean accept,
 				     gpointer data);
 void graph_plot_task_plotted(struct graph_info *ginfo,
 			     gint **plotted);
+
 
 #endif /* _TRACE_GRAPH_H */

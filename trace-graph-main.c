@@ -145,7 +145,7 @@ plot_tasks_clicked (gpointer data)
 	if (!ginfo->handle)
 		return;
 
-	tasks = trace_graph_task_list(ginfo);
+	tasks = task_list_pids(ginfo->tasks);
 	graph_plot_task_plotted(ginfo, &selected);
 
 	trace_task_dialog(ginfo->handle, tasks, selected,
