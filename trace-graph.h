@@ -25,6 +25,7 @@
 #include "trace-cmd.h"
 #include "trace-hash.h"
 #include "trace-xml.h"
+#include "rt-graph.h"
 
 struct graph_info;
 
@@ -228,6 +229,8 @@ struct graph_info {
 	struct format_field	*wakeup_success_field;
 	struct format_field	*wakeup_new_pid_field;
 	struct format_field	*wakeup_new_success_field;
+
+	struct rt_graph_info	rt_info;
 
 	gboolean		read_comms;	/* Read all comms on first load */
 
