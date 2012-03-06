@@ -40,10 +40,10 @@ gboolean is_running(struct graph_info *ginfo, struct record *record)
 }
 
 gboolean record_matches_pid(struct graph_info *ginfo,
-				   struct record *record, int match_pid,
-				   int *pid, int *sched_pid,
-				   gboolean *is_sched,
-				   gboolean *wakeup)
+			    struct record *record, int match_pid,
+			    int *pid, int *sched_pid,
+			    gboolean *is_sched,
+			    gboolean *wakeup)
 {
 	const char *comm;
 
@@ -208,9 +208,9 @@ find_record(struct graph_info *ginfo, gint pid, guint64 time)
 }
 
 int task_plot_display_last_event(struct graph_info *ginfo,
-					struct graph_plot *plot,
-					struct trace_seq *s,
-					unsigned long long time)
+				 struct graph_plot *plot,
+				 struct trace_seq *s,
+				 unsigned long long time)
 {
 	struct task_plot_info *task_info = plot->private;
 	struct event_format *event;
@@ -294,8 +294,8 @@ void task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 }
 
 void update_last_task_record(struct graph_info *ginfo,
-			       struct task_plot_info *task_info,
-			       struct record *record)
+			     struct task_plot_info *task_info,
+			     struct record *record)
 {
 	struct tracecmd_input *handle = ginfo->handle;
 	struct record *trecord, *t2record;
@@ -375,9 +375,9 @@ void update_last_task_record(struct graph_info *ginfo,
 }
 
 int task_plot_event(struct graph_info *ginfo,
-			   struct graph_plot *plot,
-			   struct record *record,
-			   struct plot_info *info)
+		    struct graph_plot *plot,
+		    struct record *record,
+		    struct plot_info *info)
 {
 	struct task_plot_info *task_info = plot->private;
 	gboolean match;
@@ -408,7 +408,6 @@ int task_plot_event(struct graph_info *ginfo,
 
 	match = record_matches_pid(ginfo, record, pid, &rec_pid,
 				   &sched_pid, &is_sched, &is_wakeup);
-
 
 	if (!match && record->cpu != task_info->last_cpu) {
 		if (!task_info->last_records[record->cpu]) {

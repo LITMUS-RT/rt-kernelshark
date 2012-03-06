@@ -80,12 +80,8 @@ static int filter_record(struct graph_info *ginfo,
 	int wake_pid;
 	int filter;
 	gint rpid;
-	gint job;
-	unsigned long long release;
-	unsigned long long deadline;
 	unsigned long long period;
 	unsigned long long wcet;
-	unsigned long long when;
 
 	*orig_pid = pevent_data_pid(ginfo->pevent, record);
 
@@ -95,14 +91,6 @@ static int filter_record(struct graph_info *ginfo,
 	/* Load real-time records */
 	rt_graph_check_task_param(&ginfo->rtinfo, ginfo->pevent, record,
 				  &rpid, &wcet, &period);
-	rt_graph_check_task_release(&ginfo->rtinfo, ginfo->pevent, record,
-				    &rpid, &job, &release, &deadline);
-	rt_graph_check_task_completion(&ginfo->rtinfo, ginfo->pevent, record,
-				       &rpid, &job, &when);
-	rt_graph_check_task_block(&ginfo->rtinfo, ginfo->pevent, record,
-				  &rpid, &when);
-	rt_graph_check_task_resume(&ginfo->rtinfo, ginfo->pevent, record,
-				   &rpid, &when);
 
 	if (trace_graph_check_sched_switch(ginfo, record, sched_pid, &comm)) {
 		is_sched_switch = TRUE;

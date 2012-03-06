@@ -11,6 +11,7 @@
 #else
 #define dprintf(l, x...)	do { if (0) printf(x); } while (0)
 #endif
+
 /**
  * rt_graph_check_task_param - check for litmus_task_param record
  * Return 1 and @pid, @wcet, and @period if the record matches
@@ -56,6 +57,94 @@ int rt_graph_check_task_param(struct rt_graph_info *rtinfo,
 
 		/* Only of these per task, so we can safely add new tasks now */
 		add_task_hash(rtinfo->tasks, *pid);
+	}
+ out:
+	return ret;
+}
+
+/**
+ * rt_graph_check_task_switch_to - check for litmus_task_switch_to record
+ * Return 1 and @pid, @job, and @when if the record matches
+ */
+int rt_graph_check_task_switch_to(struct rt_graph_info *rtinfo,
+				  struct pevent *pevent, struct record *record,
+				  gint *pid, gint *job,
+				  unsigned long long *when)
+{
+	struct event_format *event;
+	unsigned long long val;
+	gint id;
+	int ret = 0;
+
+	if (rtinfo->task_switch_to_id < 0) {
+		event = pevent_find_event_by_name(pevent, "litmus",
+						  "litmus_task_switch_to");
+		if (!event)
+			goto out;
+		rtinfo->task_switch_to_id = event->id;
+		dprintf(2, "Found task_switch_to id %d\n", event->id);
+		rtinfo->switch_to_pid_field = pevent_find_field(event, "pid");
+		rtinfo->switch_to_job_field = pevent_find_field(event, "job");
+		rtinfo->switch_to_when_field = pevent_find_field(event, "when");
+	}
+
+	id = pevent_data_type(pevent, record);
+	if (id == rtinfo->task_switch_to_id) {
+		pevent_read_number_field(rtinfo->switch_to_pid_field,
+					 record->data, &val);
+		*pid = val;
+		pevent_read_number_field(rtinfo->switch_to_job_field,
+					 record->data, &val);
+		*job = val;
+		pevent_read_number_field(rtinfo->switch_to_when_field,
+					 record->data, when);
+		ret = 1;
+		dprintf(3, "Read task_switch_to (%d) record for job %d:%d, "
+			"when: %llu\n", id, *pid, *job, *when);
+	}
+ out:
+	return ret;
+}
+
+/**
+ * rt_graph_check_task_switch_away - check for litmus_task_switch_away record
+ * Return 1 and @pid, @job, and @when if the record matches
+ */
+int rt_graph_check_task_switch_away(struct rt_graph_info *rtinfo,
+				    struct pevent *pevent, struct record *record,
+				    gint *pid, gint *job,
+				    unsigned long long *when)
+{
+	struct event_format *event;
+	unsigned long long val;
+	gint id;
+	int ret = 0;
+
+	if (rtinfo->task_switch_away_id < 0) {
+		event = pevent_find_event_by_name(pevent, "litmus",
+						  "litmus_task_switch_away");
+		if (!event)
+			goto out;
+		rtinfo->task_switch_away_id = event->id;
+		dprintf(2, "Found task_switch_away id %d\n", event->id);
+		rtinfo->switch_away_pid_field = pevent_find_field(event, "pid");
+		rtinfo->switch_away_job_field = pevent_find_field(event, "job");
+		rtinfo->switch_away_when_field = pevent_find_field(event, "when");
+	}
+
+	id = pevent_data_type(pevent, record);
+	if (id == rtinfo->task_switch_away_id) {
+		pevent_read_number_field(rtinfo->switch_away_pid_field,
+					 record->data, &val);
+		*pid = val;
+		pevent_read_number_field(rtinfo->switch_away_job_field,
+					 record->data, &val);
+		*job = val;
+		pevent_read_number_field(rtinfo->switch_away_when_field,
+					 record->data, when);
+		ret = 1;
+		dprintf(3, "Read task_switch_away (%d) record for job %d:%d, "
+			"when: %llu\n", id, *pid, *job, *when);
 	}
  out:
 	return ret;
@@ -236,6 +325,8 @@ void init_rt_event_cache(struct rt_graph_info *rtinfo)
 {
 	dprintf(1, "Initializing RT event cache\n");
 	rtinfo->task_param_id = -1;
+	rtinfo->task_switch_to_id = -1;
+	rtinfo->task_switch_away = -1;
 	rtinfo->task_release_id = -1;
 	rtinfo->task_completion_id = -1;
 	rtinfo->task_block_id = -1;
@@ -244,6 +335,14 @@ void init_rt_event_cache(struct rt_graph_info *rtinfo)
 	rtinfo->param_pid_field = NULL;
 	rtinfo->param_wcet_field = NULL;
 	rtinfo->param_period_field = NULL;
+
+	rtinfo->switch_to_pid_field = NULL;
+	rtinfo->switch_to_job_field = NULL;
+	rtinfo->switch_to_when_field = NULL;
+
+	rtinfo->switch_away_pid_field = NULL;
+	rtinfo->switch_away_job_field = NULL;
+	rtinfo->switch_away_when_field = NULL;
 
 	rtinfo->release_pid_field = NULL;
 	rtinfo->release_job_field = NULL;

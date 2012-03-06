@@ -49,11 +49,26 @@ struct plot_info {
 	gboolean		line;
 	int			lcolor;
 	unsigned long long	ltime;
+
 	gboolean		box;
 	int			bcolor;
 	unsigned long long	bstart;
 	unsigned long long	bend;
 	gboolean		bfill;
+	gboolean		bthin;
+	char			*blabel;
+
+	gboolean		release;
+	unsigned long long	rtime;
+	char			*rlabel;
+
+	gboolean		deadline;
+	unsigned long long	dtime;
+	char			*dlabel;
+
+	gboolean		completion;
+	unsigned long long	ctime;
+	char			*clabel;
 };
 
 /*

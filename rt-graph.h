@@ -8,7 +8,7 @@
 
 struct rt_graph_info {
 
-	/* List of all tasks */
+	/* List of all real-time tasks */
 	struct task_list 	*tasks[TASK_HASH_SIZE];
 
 	/* Cache of event fields so that they don't need to be located
@@ -18,6 +18,16 @@ struct rt_graph_info {
 	struct format_field 	*param_pid_field;
 	struct format_field 	*param_wcet_field;
 	struct format_field 	*param_period_field;
+
+	gint			task_switch_to_id;
+	struct format_field	*switch_to_pid_field;
+	struct format_field	*switch_to_job_field;
+	struct format_field	*switch_to_when_field;
+
+	gint			task_switch_away_id;
+	struct format_field	*switch_to_pid_field;
+	struct format_field	*switch_to_job_field;
+	struct format_field	*switch_to_when_field;
 
 	gint 			task_release_id;
 	struct format_field 	*release_pid_field;
@@ -37,7 +47,6 @@ struct rt_graph_info {
 	gint 			task_resume_id;
 	struct format_field 	*resume_pid_field;
 	struct format_field	*resume_when_field;
-
 };
 
 /* Event parsers */
@@ -45,6 +54,12 @@ int rt_graph_check_task_param(struct rt_graph_info *rtinfo, struct pevent *peven
 			      struct record *record, gint *pid,
 			      unsigned long long *wcet,
 			      unsigned long long *period);
+int rt_graph_check_task_switch_to(struct rt_graph_info *rtinfo, struct pevent *pevent,
+				  struct record *record, gint *pid, gint *job,
+				  unsigned long long *when);
+int rt_graph_check_task_switch_away(struct rt_graph_info *rtinfo, struct pevent *pevent,
+				    struct record *record, gint *pid, gint *job,
+				    unsigned long long *when);
 int rt_graph_check_task_release(struct rt_graph_info *rtinfo, struct pevent *pevent,
 				struct record *record, gint *pid, gint *job,
 				unsigned long long *release,
