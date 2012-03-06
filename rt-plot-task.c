@@ -2,24 +2,28 @@
 
 #define LLABEL 30
 
+#define DEBUG_LEVEL	4
+#if DEBUG_LEVEL > 0
+#define dprintf(l, x...)			\
+	do {					\
+		if (l <= DEBUG_LEVEL)		\
+			printf(x);		\
+	} while (0)
+#else
+#define dprintf(l, x...)	do { if (0) printf(x); } while (0)
+#endif
+
 /* Ok to do it this way as long as it remains single threaded */
 static void update_job(struct rt_task_info *rtt_info, int job)
 {
 	if (job < rtt_info->last_job) {
 		die("Inconsistent job state for %d:%d -> %d\n",
 		    rtt_info->base.pid, rtt_info->last_job, job);
-	}
-	if (job > rtt_info->last_job) {
+	} else if (job > rtt_info->last_job) {
 		rtt_info->last_job = job;
 		snprintf(rtt_info->label, LLABEL, "%d:%d",
 			 rtt_info->base.pid, rtt_info->last_job);
 	}
-}
-
-static inline void create_job_label(char *label, int pid, int job)
-{
-	label = malloc_or_die(20);
-	snprintf(label, 20, "%d:%d", pid, job);
 }
 
 static int try_param(struct graph_info *ginfo, struct rt_task_info *rtt_info,
@@ -35,10 +39,10 @@ static int try_param(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	match = rt_graph_check_task_param(&ginfo->rtinfo, ginfo->pevent,
 					  record, &pid, &wcet, &period);
 	if (match && pid == rtt_info->base.pid) {
+		update_job(rtt_info, 0);
 		rtt_info->wcet = wcet;
 		rtt_info->period = period;
 		rtt_info->params_found = TRUE;
-		update_job(rtt_info, 0);
 		ret = 1;
 	}
  out:
@@ -56,6 +60,7 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 					    record, &pid, &job,
 					    &release, &deadline);
 	if (match && pid == rtt_info->base.pid) {
+		update_job(rtt_info, job);
 		info->release = TRUE;
 		info->rtime = release;
 		info->rlabel = rtt_info->label;
@@ -64,7 +69,6 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		info->dtime = deadline;
 		info->dlabel = rtt_info->label;
 
-		update_job(rtt_info, job);
 		ret = 1;
 	}
 	return ret;
@@ -75,15 +79,15 @@ static int try_completion(struct graph_info *ginfo,
 			  struct record *record, struct plot_info *info)
 {
 	int pid, job, match, ret = 0;
-	unsigned long long when;
+	unsigned long long ts;
 
 	match = rt_graph_check_task_completion(&ginfo->rtinfo, ginfo->pevent,
-					       record, &pid, &job, &when);
+					       record, &pid, &job, &ts);
 	if (match && pid == rtt_info->base.pid) {
-		info->completion = TRUE;
-		info->ctime = when;
-		info->clabel = rtt_info->label;
 		update_job(rtt_info, job);
+		info->completion = TRUE;
+		info->ctime = ts;
+		info->clabel = rtt_info->label;
 		ret = 1;
 	}
 	return ret;
@@ -93,12 +97,12 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		     struct record *record, struct plot_info *info)
 {
 	int pid, match, ret = 0;
-	unsigned long long when;
+	unsigned long long ts;
 
 	match = rt_graph_check_task_block(&ginfo->rtinfo, ginfo->pevent,
-					  record, &pid, &when);
+					  record, &pid, &ts);
 	if (match && pid == rtt_info->base.pid) {
-		rtt_info->block_time = when;
+		rtt_info->block_time = ts;
 		ret = 1;
 	}
 	return ret;
@@ -108,20 +112,78 @@ static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		      struct record *record, struct plot_info *info)
 {
 	int pid, match, ret = 0;
-	unsigned long long when;
+	unsigned long long ts;
 
 	match = rt_graph_check_task_resume(&ginfo->rtinfo, ginfo->pevent,
-					   record, &pid, &when);
+					   record, &pid, &ts);
 	if (match && pid == rtt_info->base.pid) {
-		rtt_info->block_time = when;
 		info->box = TRUE;
 		info->bcolor = 0x0;
 		info->bfill = TRUE;
 		info->bthin = TRUE;
 		info->bstart = rtt_info->block_time;
-		info->bend = when;
+		info->bend = ts;
 
-		rtt_info->block_time = -1;
+		rtt_info->block_time = 0ULL;
+
+		ret = 1;
+	}
+	return ret;
+}
+
+static unsigned long long
+try_switch_away(struct graph_info *ginfo, struct rt_task_info *rtt_info,
+		struct record *record, struct plot_info *info)
+{
+	int job, pid, match, ret = 0;
+	unsigned long long ts;
+
+	match = rt_graph_check_switch_away(&ginfo->rtinfo, ginfo->pevent,
+					   record, &pid, &job, &ts);
+	if (match && pid == rtt_info->base.pid) {
+		update_job(rtt_info, job);
+
+		if (rtt_info->run_time && rtt_info->run_time < ts) {
+			dprintf(3, "Box for %d:%d, %llu to %llu on CPU %d\n",
+				rtt_info->base.pid, rtt_info->last_job,
+				rtt_info->run_time, ts, rtt_info->last_cpu);
+			info->box = TRUE;
+			info->bcolor = hash_cpu(rtt_info->last_cpu);
+			info->bfill = TRUE;
+			info->bstart = rtt_info->run_time;
+			info->bend = ts;
+			info->blabel = rtt_info->label;
+		}
+
+		rtt_info->run_time = 0ULL;
+		rtt_info->last_cpu = -1;
+
+		ret = 1;
+	}
+	return ret;
+}
+
+static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info,
+			 struct record *record, struct plot_info *info)
+{
+	int job, pid, match, ret = 0;
+	unsigned long long ts;
+
+	match = rt_graph_check_switch_to(&ginfo->rtinfo, ginfo->pevent,
+					 record, &pid, &job, &ts);
+	if (match && pid == rtt_info->base.pid) {
+		update_job(rtt_info, job);
+
+		rtt_info->run_time = ts;
+		rtt_info->last_cpu = record->cpu;
+
+		info->line = TRUE;
+		info->lcolor = hash_pid(record->cpu);
+		info->ltime = ts;
+
+		dprintf(3, "Switching to %d:%d at %llu on CPU %d\n",
+			rtt_info->base.pid, rtt_info->last_job,
+			ts, rtt_info->last_cpu);
 
 		ret = 1;
 	}
@@ -129,71 +191,27 @@ static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 }
 
 static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
-		     struct record *record, struct plot_info *info)
+		   struct record *record, struct plot_info *info)
 {
-	int pid, is_sched, is_wakeup, rec_pid, sched_pid, match, ret = 0;
+	int pid, epid, ret = 0;
+	unsigned long long ts;
 	struct task_plot_info *task_info = &rtt_info->base;
 
 	pid = task_info->pid;
-	match = record_matches_pid(ginfo, record, pid, &rec_pid,
-				   &sched_pid, &is_sched, &is_wakeup);
-	if (match) {
+	rt_graph_check_any(&ginfo->rtinfo, ginfo->pevent, record, &epid, &ts);
+
+	if (pid == epid || record->cpu == rtt_info->last_cpu) {
 		info->line = TRUE;
-		info->lcolor = hash_pid(rec_pid);
-		info->ltime = record->ts;
+		info->lcolor = hash_pid(record->cpu);
+		info->ltime = ts;
 		ret = 1;
-
-		update_last_task_record(ginfo, task_info, record);
-
-		if (is_wakeup) {
-			/* Another task is running on this CPU now */
-			info->ltime = hash_pid(rec_pid);
-			if (task_info->last_cpu == record->cpu) {
-				info->box = TRUE;
-				info->bcolor = hash_cpu(task_info->last_cpu);
-				info->bstart = task_info->last_time;
-				info->bend = record->ts;
-				task_info->last_cpu = -1;
-			}
-			goto out;
-		}
-
-		if (task_info->last_cpu != record->cpu) {
-			/* Switched cpus */
-			if (task_info->last_cpu >= 0) {
-				info->box = TRUE;
-				info->bcolor = hash_cpu(task_info->last_cpu);
-				info->bstart = task_info->last_time;
-				info->bend = record->ts;
-			}
-			task_info->last_time = record->ts;
-		}
-
-		task_info->last_cpu = record->cpu;
-		if (is_sched) {
-			if (rec_pid != pid) {
-				/* Scheduled in */
-				task_info->last_cpu = record->cpu;
-				task_info->last_time = record->ts;
-			} else if (!info->box) {
-				/* Scheduled out */
-				info->box = TRUE;
-				info->bcolor = hash_cpu(task_info->last_cpu);
-				info->bstart = task_info->last_time;
-				info->bend = record->ts;
-				task_info->last_cpu = -1;
-			}
-		}
 	}
- out:
-	if (info->box) {
-		info->blabel = rtt_info->label;
-	}
+
 	return ret;
 }
 
-int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
-		       struct record *record, struct plot_info *info)
+static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
+			      struct record *record, struct plot_info *info)
 {
 	struct rt_task_info *rtt_info = plot->private;
 	struct task_plot_info *task_info = &rtt_info->base;
@@ -215,11 +233,13 @@ int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		return 0;
 	}
 
-	match = try_param(ginfo, rtt_info, record, info)      ||
-		try_release(ginfo, rtt_info, record, info)    ||
-		try_completion(ginfo, rtt_info, record, info) ||
-		try_block(ginfo, rtt_info, record, info)      ||
-		try_resume(ginfo, rtt_info, record, info)     ||
+	match = try_param(ginfo, rtt_info, record, info)       ||
+		try_switch_away(ginfo, rtt_info, record, info) ||
+		try_switch_to(ginfo, rtt_info, record, info)   ||
+		try_release(ginfo, rtt_info, record, info)     ||
+		try_completion(ginfo, rtt_info, record, info)  ||
+		try_block(ginfo, rtt_info, record, info)       ||
+		try_resume(ginfo, rtt_info, record, info)      ||
 		try_other(ginfo, rtt_info, record, info);
 
 	/* This record is neither on our CPU nor related to us, useless */
@@ -238,24 +258,15 @@ int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			free_record(task_info->last_records[cpu]);
 			task_info->last_records[cpu] = record;
 		}
-
-		/* We were on a CPU, now scheduled out */
-		if (task_info->last_cpu >= 0) {
-			info->box = TRUE;
-			info->bcolor = hash_cpu(task_info->last_cpu);
-			info->bstart = task_info->last_time;
-			info->bend = record->ts;
-			task_info->last_cpu = -1;
-		}
 	} else {
 		update_last_task_record(ginfo, task_info, record);
 	}
- out:
+
 	return 1;
 }
 
-void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
-			unsigned long long time)
+static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
+			       unsigned long long time)
 {
 	struct rt_task_info *rtt_info = plot->private;
 
@@ -263,13 +274,15 @@ void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 
 	rtt_info->wcet = 0ULL;
 	rtt_info->period = 0ULL;
+	rtt_info->run_time = 0ULL;
 	rtt_info->block_time = 0ULL;
+	rtt_info->last_cpu = -1;
 	rtt_info->last_job = -1;
 	rtt_info->params_found = FALSE;
 	update_job(rtt_info, 0);
 }
 
-void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
+static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
 {
 	struct rt_task_info *rtt_info = plot->private;
 	free(rtt_info->label);

@@ -5,10 +5,16 @@
 
 struct rt_task_info {
 	struct task_plot_info	base;
+
 	unsigned long long	wcet;
 	unsigned long long	period;
+
+	unsigned long long	run_time;
 	unsigned long long	block_time;
+
 	int			last_job;
+	int			last_cpu;
+
 	gboolean		params_found;
 	char			*label;
 };

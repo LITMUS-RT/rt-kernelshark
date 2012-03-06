@@ -406,6 +406,7 @@ struct pevent {
 
 	/* cache */
 	struct event_format *last_event;
+
 };
 
 /* Can be overridden */
