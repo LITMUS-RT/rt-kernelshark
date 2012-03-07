@@ -51,7 +51,7 @@ next_rts(struct graph_info *ginfo, int cpu, unsigned long long time)
 static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
 {
 	struct record *record;
-	unsigned long long rts, seek_time, last_seek;
+	unsigned long long last_rts, rts, seek_time, last_seek;
 	long long diff;
 
 	rts = next_rts(ginfo, cpu, time);
@@ -70,9 +70,10 @@ static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long lon
 		 */
 		do {
 			last_seek = seek_time;
+			last_rts = rts;
 			seek_time = seek_time + 1.5 * (time - rts);
 			rts = next_rts(ginfo, cpu, seek_time);
-		} while (rts < time);
+		} while (rts < time && last_rts != rts);
 		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, last_seek);
 		seek_time = last_seek;
 	} else if (rts && diff < 0) {
@@ -182,6 +183,7 @@ static int try_param(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		rtt_info->period = period;
 		rtt_info->params_found = TRUE;
 		ret = 1;
+		rtt_info->first_rels[0] = get_rts(ginfo, record);
 	}
  out:
 	return ret;
@@ -206,6 +208,9 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		info->deadline = TRUE;
 		info->dtime = deadline;
 		info->dlabel = rtt_info->label;
+
+		if (job <= 3)
+			rtt_info->first_rels[job - 1] = release;
 
 		ret = 1;
 	}
@@ -365,6 +370,7 @@ get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	struct rt_graph_info *rtg_info = &ginfo->rtinfo;
 
 	last_record = tracecmd_peek_data(ginfo->handle, cpu);
+	*out_job = *out_release = *out_deadline = 0;
 	if (!last_record)
 		return NULL;
 	last_record->ref_count++;
@@ -415,14 +421,22 @@ static int get_time_info(struct graph_info *ginfo,
 	struct offset_cache *offsets;
 
 	/* Seek CPUs to first record after this time */
+	*out_job = *out_release = *out_deadline = 0;
 	*out_record = find_record(ginfo, rtt_info->base.pid, time);
 	if (!*out_record)
+		return 0;
+
+	/* This is not necessarily correct for sporadic, but will do for now */
+	if (time < rtt_info->first_rels[2]) {
+		job = (time >= rtt_info->first_rels[1]) ? 2 : 1;
+		*out_job = job;
+		*out_release = rtt_info->first_rels[job - 1];
+		*out_deadline = rtt_info->first_rels[job];
 		goto out;
+	}
 
 	min_ts = time - 2*rtt_info->wcet;
-	*out_job = 0;
-	*out_release = 0;
-	*out_deadline = 0;
+	*out_job = *out_release = *out_deadline = 0;
 
 	offsets = save_offsets(ginfo);
 	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
@@ -438,7 +452,7 @@ static int get_time_info(struct graph_info *ginfo,
 	}
 	restore_offsets(ginfo, offsets);
  out:
-	return (min_ts == 0);
+	return 1;
 }
 
 static inline int in_res(struct graph_info *ginfo, unsigned long long time,
@@ -457,7 +471,6 @@ static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 
 	/* No more records, finish what we started */
 	if (!record) {
-		update_last_task_record(ginfo, task_info, record);
 		if (task_info->last_cpu >= 0) {
 			info->box = TRUE;
 			info->bstart = task_info->last_time;
@@ -496,8 +509,6 @@ static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			free_record(task_info->last_records[cpu]);
 			task_info->last_records[cpu] = record;
 		}
-	} else {
-		update_last_task_record(ginfo, task_info, record);
 	}
 
 	return 1;
@@ -506,6 +517,7 @@ static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 			       unsigned long long time)
 {
+	int i;
 	struct rt_task_info *rtt_info = plot->private;
 
 	task_plot_start(ginfo, plot, time);
@@ -517,6 +529,8 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 	rtt_info->last_cpu = -1;
 	rtt_info->last_job = -1;
 	rtt_info->params_found = FALSE;
+	for (i = 0; i < 3; i++)
+		rtt_info->first_rels[i] = 0ULL;
 	update_job(rtt_info, 0);
 }
 
@@ -564,7 +578,7 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 			  unsigned long long time)
 {
 	const char *comm;
-	int show_dead, show_rel, pid, job, eid;
+	int pid, job, eid;
 	struct record *record;
 	struct event_format *event;
 	unsigned long usec, sec;
@@ -576,17 +590,11 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 	get_time_info(ginfo, rtt_info, time,
 		      &job, &release, &deadline, &record);
 	restore_offsets(ginfo, offsets);
-	show_rel  = in_res(ginfo, release, time);
-	show_dead = in_res(ginfo, deadline, time);
 
 	/* Show real-time data about time */
 	pid = rtt_info->base.pid;
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 	trace_seq_printf(s, "%s - %d:%d\n", comm, pid, job);
-	if (show_rel)
-		trace_seq_printf(s, "RELEASE\n");
-	if (show_dead)
-		trace_seq_printf(s, "DEADLINE\n");
 
 	if (record) {
 		rts = get_rts(ginfo, record);

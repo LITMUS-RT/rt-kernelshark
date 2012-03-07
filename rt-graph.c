@@ -65,6 +65,10 @@ int rt_graph_check_any(struct rt_graph_info *rtinfo,
 	struct format_field *field;
 
 	eid = pevent_data_type(pevent, record);
+
+	if (eid == rtinfo->switch_away_id)
+		return 0;
+
 	key = get_event_hash_key(eid);
 	field = find_ts_hash(rtinfo->events, key, eid);
 

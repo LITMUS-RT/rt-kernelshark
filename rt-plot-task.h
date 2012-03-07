@@ -7,7 +7,6 @@ struct rt_task_info {
 	struct task_plot_info	base;
 
 	int			pid;
-
 	unsigned long long	wcet;
 	unsigned long long	period;
 
@@ -16,6 +15,9 @@ struct rt_task_info {
 
 	int			last_job;
 	int			last_cpu;
+
+	/* Used to get around bugs(ish) */
+	unsigned long long	first_rels[3];
 
 	gboolean		params_found;
 	char			*label;
