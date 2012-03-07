@@ -13,7 +13,159 @@
 #define dprintf(l, x...)	do { if (0) printf(x); } while (0)
 #endif
 
-/* Ok to do it this way as long as it remains single threaded */
+/*
+ * Extract timestamp from a record, attempting to use cache if possible
+ */
+static unsigned long long
+get_rts(struct graph_info *ginfo, struct record *record)
+{
+	gint epid;
+	unsigned long long ts;
+	if (!record->cached_rts) {
+		rt_graph_check_any(&ginfo->rtinfo, ginfo->pevent, record,
+				   &epid, &ts);
+		record->cached_rts = ts;
+	} else
+		ts = record->cached_rts;
+	return ts;
+}
+
+/*
+ * Get the real-time timestamp of the next record at time
+ */
+static unsigned long long
+next_rts(struct graph_info *ginfo, int cpu, unsigned long long time)
+{
+	struct record *record;
+	unsigned long long ts;
+	tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, time);
+	record = tracecmd_read_data(ginfo->handle, cpu);
+	if (record) {
+		ts = get_rts(ginfo, record);
+		free_record(record);
+		return ts;
+	} else
+		return 0;
+}
+
+static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
+{
+	struct record *record;
+	unsigned long long rts, seek_time, last_seek;
+	long long diff;
+
+	rts = next_rts(ginfo, cpu, time);
+	diff = time - rts;
+
+	/* "Guess" a new target based on difference */
+	seek_time = time + diff;
+	rts = next_rts(ginfo, cpu, seek_time);
+	diff = time - rts;
+
+	/* Zero in in 1.5x the difference increments */
+	if (rts && diff > 0) {
+		/*   rts       time
+		 *   seek        ?
+		 * ---|---->>----|---
+		 */
+		do {
+			last_seek = seek_time;
+			seek_time = seek_time + 1.5 * (time - rts);
+			rts = next_rts(ginfo, cpu, seek_time);
+		} while (rts < time);
+		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, last_seek);
+		seek_time = last_seek;
+	} else if (rts && diff < 0) {
+		/*   time      rts
+		 *    ?        seek
+		 * ---|----<<----|---
+		 */
+		do {
+			seek_time = seek_time - 1.5 * (rts - time);
+			rts = next_rts(ginfo, cpu, seek_time);
+		} while (rts > time);
+	}
+
+	/* Get to first record at or after time */
+	while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
+		if (get_rts(ginfo, record) >= time)
+			break;
+		free_record(record);
+	}
+	if (record) {
+		tracecmd_set_cursor(ginfo->handle, cpu, record->offset);
+		free_record(record);
+	} else
+		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, seek_time);
+}
+
+void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
+{
+	int cpu;
+	for (cpu = 0; cpu < ginfo->cpus; cpu++)
+		set_cpu_to_time(cpu, ginfo, time);
+}
+
+static gboolean record_matches_pid(struct graph_info *ginfo,
+				   struct record *record,
+				   int match_pid)
+{
+	guint eid, pid;
+	unsigned long long val;
+	struct format_field *pid_field = NULL;
+	struct rt_graph_info *rtinfo = &ginfo->rtinfo;
+
+	eid = pevent_data_type(ginfo->pevent, record);
+	if (eid == rtinfo->task_param_id)
+		pid_field = rtinfo->param_pid_field;
+	else if (eid == rtinfo->switch_to_id)
+		pid_field = rtinfo->switch_to_pid_field;
+	else if (eid == rtinfo->switch_away_id)
+		pid_field = rtinfo->switch_away_pid_field;
+	else if (eid == rtinfo->task_release_id)
+		pid_field = rtinfo->release_pid_field;
+	else if (eid == rtinfo->task_completion_id)
+		pid_field = rtinfo->completion_pid_field;
+	else if (eid == rtinfo->task_block_id)
+		pid_field = rtinfo->block_pid_field;
+	else if (eid == rtinfo->task_resume_id)
+		pid_field = rtinfo->resume_pid_field;
+
+	if (pid_field) {
+		pevent_read_number_field(rtinfo->param_pid_field,
+					 record->data, &val);
+		pid = val;
+	} else {
+		pid = pevent_data_pid(ginfo->pevent, record);
+	}
+
+	if (pid == match_pid)
+		return TRUE;
+	else
+		return FALSE;
+}
+
+struct record*
+find_record(struct graph_info *ginfo, gint pid, guint64 time)
+{
+	int next_cpu, match;
+	struct record *record = NULL;
+
+	set_cpus_to_time(ginfo, time);
+	do {
+		free_record(record);
+		record = tracecmd_read_next_data(ginfo->handle, &next_cpu);
+		if (!record)
+			return NULL;
+		match = record_matches_pid(ginfo, record, pid);
+	} while (!(get_rts(ginfo, record) > time && match));
+
+	return record;
+}
+
+/*
+ * Update current job in @rtt_info, ensuring monotonic increase
+ */
 static void update_job(struct rt_task_info *rtt_info, int job)
 {
 	if (job < rtt_info->last_job) {
@@ -88,6 +240,9 @@ static int try_completion(struct graph_info *ginfo,
 		info->completion = TRUE;
 		info->ctime = ts;
 		info->clabel = rtt_info->label;
+		info->line = TRUE;
+		info->lcolor = hash_pid(record->cpu);
+		info->ltime = ts;
 		ret = 1;
 	}
 	return ret;
@@ -176,10 +331,6 @@ static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info
 
 		rtt_info->run_time = ts;
 		rtt_info->last_cpu = record->cpu;
-
-		info->line = TRUE;
-		info->lcolor = hash_pid(record->cpu);
-		info->ltime = ts;
 
 		dprintf(3, "Switching to %d:%d at %llu on CPU %d\n",
 			rtt_info->base.pid, rtt_info->last_job,
@@ -289,15 +440,65 @@ static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *pl
 	task_plot_destroy(ginfo, plot);
 }
 
+static int rt_task_plot_display_last_event(struct graph_info *ginfo,
+				 struct graph_plot *plot,
+				 struct trace_seq *s,
+				 unsigned long long time)
+{
+	trace_seq_printf(s, "Displaying last event at %llu\n",
+			 time);
+	return 1;
+}
+
+static int rt_task_plot_display_info(struct graph_info *ginfo,
+			  struct graph_plot *plot,
+			  struct trace_seq *s,
+			  unsigned long long time)
+{
+	int type;
+	struct record *record;
+	struct event_format *event;
+	unsigned long sec, usec;
+	struct rt_task_info *rtt_info = plot->private;
+
+	record = find_record(ginfo, rtt_info->base.pid, time);
+	if (!record)
+		return 0;
+
+	/* Display only if the record's time is close enough */
+	if (get_rts(ginfo, record) > time - 2/ginfo->resolution &&
+	    get_rts(ginfo, record) < time + 2/ginfo->resolution) {
+
+		type = pevent_data_type(ginfo->pevent, record);
+		event = pevent_data_event_from_type(ginfo->pevent, type);
+		if (event) {
+			trace_seq_puts(s, event->name);
+			trace_seq_putc(s, '\n');
+			pevent_event_info(s, event, record);
+			trace_seq_putc(s, '\n');
+		} else
+			trace_seq_printf(s, "UNKNOWN EVENT %d\n", type);
+	}
+
+	/* Display a timestamp always */
+	convert_nano(get_rts(ginfo, record), &sec, &usec);
+	trace_seq_printf(s, "%lu.%06lu CPU: %03d",
+			 sec, usec, record->cpu);
+	free_record(record);
+
+	return 1;
+}
+
 static const struct plot_callbacks rt_task_cb = {
 	.plot_event		= rt_task_plot_event,
 	.start			= rt_task_plot_start,
 	.destroy		= rt_task_plot_destroy,
 
+	.display_last_event	= rt_task_plot_display_last_event,
+	.display_info		= rt_task_plot_display_info,
+
 	.match_time		= task_plot_match_time,
-	.display_last_event	= task_plot_display_last_event,
 	.find_record		= task_plot_find_record,
-	.display_info		= task_plot_display_info,
 };
 
 void rt_plot_task_update_callback(gboolean accept,

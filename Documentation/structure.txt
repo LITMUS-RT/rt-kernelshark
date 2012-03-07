@@ -99,6 +99,7 @@ struct trace-plot-task.c {
 
   /* Return first record after time which is from our pid */
   find_record(ginfo, pid, time);
+    - set_cpus_to_time
 
   /* Updates last_whatevers in task info */
   update_last_record(ginfo, task_plot_info, record);
@@ -107,6 +108,9 @@ struct trace-plot-task.c {
   find_previous_record(ginfo, start_record, pid, cpu);
 
   get_display_record(ginfo, pid, time);
+    - find_record
+    - find_previous_record
+
 
   /**** PUBLIC METHODS *****/
 
@@ -118,6 +122,19 @@ struct trace-plot-task.c {
 
   /* Get record at time, print info */
   task_plot_display_last_event(info, plot, trace_seq s, time);
+
+  /* Just frontend for find_record */
+  task_plot_find_record(ginfo, plot, time);
+
+  /* Print out event info if in current resolution */
+  task_plot_display_info(ginfo, plot, sequence s, time);
+   - get_display_record
+     - find_record
+       - set_cpus_to_time
+     - find_previous_record
+
+  /* Free private info */
+  task_plot_destroy(info, plot);
 
   /* Always draws a line of the color of the pid. Always.
    * Then update_last_record.
@@ -140,15 +157,6 @@ struct trace-plot-task.c {
    *   Finish the box.
    */
   task_plot_event(ginfo, plot,r ecord, info);
-
-  /* Just frontend for find_record */
-  task_plot_find_record(ginfo, plot, time);
-
-  /* Print out event info if in current resolution */
-  task_plot_display_info(ginfo, plot, sequence s, time);
-
-  /* Free private info */
-  task_plot_destroy(info, plot);
 
 
   /*** STATIC METHODS ***/

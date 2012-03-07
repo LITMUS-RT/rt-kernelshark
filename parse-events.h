@@ -42,6 +42,7 @@
 struct record {
 	unsigned long long	ts;
 	unsigned long long	offset;
+	unsigned long long	cached_rts;
 	long long		missed_events;	/* buffer dropped events before */
 	int			record_size;	/* size of binary record */
 	int			size;		/* size of data */

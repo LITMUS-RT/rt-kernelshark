@@ -39,11 +39,11 @@ gboolean is_running(struct graph_info *ginfo, struct record *record)
 	return val ? FALSE : TRUE;
 }
 
-gboolean record_matches_pid(struct graph_info *ginfo,
-			    struct record *record, int match_pid,
-			    int *pid, int *sched_pid,
-			    gboolean *is_sched,
-			    gboolean *wakeup)
+static gboolean record_matches_pid(struct graph_info *ginfo,
+				   struct record *record, int match_pid,
+				   int *pid, int *sched_pid,
+				   gboolean *is_sched,
+				   gboolean *wakeup)
 {
 	const char *comm;
 
@@ -73,7 +73,7 @@ gboolean record_matches_pid(struct graph_info *ginfo,
 	return FALSE;
 }
 
-void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
+static void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
 {
 	struct record *record;
 
@@ -92,7 +92,7 @@ void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time)
 		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, time);
 }
 
-void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
+static void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time)
 {
 	int cpu;
 
@@ -177,7 +177,7 @@ void restore_offsets(struct graph_info *ginfo, struct offset_cache *offsets)
 	free(offsets);
 }
 
-struct record *
+static struct record *
 find_record(struct graph_info *ginfo, gint pid, guint64 time)
 {
 	struct record *record = NULL;
@@ -206,6 +206,7 @@ find_record(struct graph_info *ginfo, gint pid, guint64 time)
 
 	return record;
 }
+
 
 int task_plot_display_last_event(struct graph_info *ginfo,
 				 struct graph_plot *plot,
@@ -263,7 +264,6 @@ int task_plot_display_last_event(struct graph_info *ginfo,
 					 pid);
 		}
 	} else {
-			
 		/* Must have the record we want */
 		type = pevent_data_type(ginfo->pevent, record);
 		event = pevent_data_event_from_type(ginfo->pevent, type);

@@ -1625,6 +1625,7 @@ tracecmd_read_page_record(struct pevent *pevent, void *page, int size,
 	record->cpu = 0;
 	record->data = ptr;
 	record->ref_count = 1;
+	record->cached_rts = 0ULL;
 
 	return record;
 }
@@ -1745,6 +1746,7 @@ read_again:
 	record->missed_events = missed_events;
 	record->ref_count = 1;
 	record->locked = 1;
+	record->cached_rts = 0ULL;
 
 	ptr += length;
 

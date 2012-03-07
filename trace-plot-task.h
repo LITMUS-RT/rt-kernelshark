@@ -41,9 +41,6 @@ struct task_plot_info {
 
 /* Querying records */
 gboolean is_running(struct graph_info *ginfo, struct record *record);
-/* gboolean record_matches_pid(struct graph_info *ginfo, struct record *record, */
-/* 			    int match_pid, int *pid, int *sched_pid, */
-/* 			    gboolean *is_sched, gboolean *wakeup); */
 
 /* State maintenance */
 void update_last_task_record(struct graph_info *ginfo, struct task_plot_info *task_info,
@@ -51,20 +48,11 @@ void update_last_task_record(struct graph_info *ginfo, struct task_plot_info *ta
 
 /* Searching for records */
 #define MAX_SEARCH 20
-struct record *
-find_record(struct graph_info *ginfo, gint pid, guint64 time);
 struct record *find_previous_record(struct graph_info *ginfo,
 					   struct record *start_record,
 					   int pid, int cpu);
 struct record *get_display_record(struct graph_info *ginfo, int pid,
 				  unsigned long long time);
-gboolean record_matches_pid(struct graph_info *ginfo, struct record *record,
-			    int match_pid, int *pid, int *sched_pid,
-			    gboolean *is_sched, gboolean *wakeup);
-
-/* Seeking in data file */
-void set_cpu_to_time(int cpu, struct graph_info *ginfo, unsigned long long time);
-void set_cpus_to_time(struct graph_info *ginfo, unsigned long long time);
 
 /* Saving / restoring state */
 struct offset_cache {

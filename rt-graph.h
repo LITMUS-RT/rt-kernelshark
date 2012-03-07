@@ -7,7 +7,7 @@
 #include "rt-plot-task.h"
 
 #define RT_TS_FIELD "__rt_ts"
-#define TS_HASH_SIZE 6
+#define TS_HASH_SIZE 12
 struct ts_list;
 
 struct rt_graph_info {
@@ -52,7 +52,7 @@ struct rt_graph_info {
 	struct format_field 	*resume_pid_field;
 	struct format_field	*resume_ts_field;
 
-	/* Cache of ts fields for new events */
+	/* Cache of ts fields for non-litmus events */
 	struct ts_list		*events[TS_HASH_SIZE];
 };
 

@@ -121,7 +121,6 @@ int rt_graph_check_task_param(struct rt_graph_info *rtinfo,
 		dprintf(3, "Read task_param (%d) record for task %d "
 			"(%llu, %llu)\n", id, *pid, *wcet, *period);
 
-		/* Only of these per task, so we can safely add new tasks now */
 		add_task_hash(rtinfo->tasks, *pid);
 	}
  out:
