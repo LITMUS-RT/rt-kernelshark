@@ -63,9 +63,9 @@ struct ts_list {
 };
 
 /* Event parsers */
-void rt_graph_check_any(struct rt_graph_info *rtinfo,
-			struct pevent *pevent, struct record *record,
-			gint *epid, unsigned long long *ts);
+int rt_graph_check_any(struct rt_graph_info *rtinfo,
+		       struct pevent *pevent, struct record *record,
+		       gint *pid, unsigned long long *ts);
 int rt_graph_check_task_param(struct rt_graph_info *rtinfo, struct pevent *pevent,
 			      struct record *record, gint *pid,
 			      unsigned long long *wcet,

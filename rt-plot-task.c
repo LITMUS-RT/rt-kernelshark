@@ -110,39 +110,23 @@ static gboolean record_matches_pid(struct graph_info *ginfo,
 				   struct record *record,
 				   int match_pid)
 {
-	guint eid, pid;
-	unsigned long long val;
-	struct format_field *pid_field = NULL;
-	struct rt_graph_info *rtinfo = &ginfo->rtinfo;
+	gint dint, pid = 0, match = 0;
+	unsigned long long dull;
+	struct rt_graph_info *rtg_info = &ginfo->rtinfo;
 
-	eid = pevent_data_type(ginfo->pevent, record);
-	if (eid == rtinfo->task_param_id)
-		pid_field = rtinfo->param_pid_field;
-	else if (eid == rtinfo->switch_to_id)
-		pid_field = rtinfo->switch_to_pid_field;
-	else if (eid == rtinfo->switch_away_id)
-		pid_field = rtinfo->switch_away_pid_field;
-	else if (eid == rtinfo->task_release_id)
-		pid_field = rtinfo->release_pid_field;
-	else if (eid == rtinfo->task_completion_id)
-		pid_field = rtinfo->completion_pid_field;
-	else if (eid == rtinfo->task_block_id)
-		pid_field = rtinfo->block_pid_field;
-	else if (eid == rtinfo->task_resume_id)
-		pid_field = rtinfo->resume_pid_field;
-
-	if (pid_field) {
-		pevent_read_number_field(rtinfo->param_pid_field,
-					 record->data, &val);
-		pid = val;
-	} else {
-		pid = pevent_data_pid(ginfo->pevent, record);
-	}
-
-	if (pid == match_pid)
-		return TRUE;
-	else
-		return FALSE;
+	/* Must use check_* in case record has not been found yet,
+	 * this macro was the best of many terrible options
+	 */
+#define MARGS rtg_info, ginfo->pevent, record, &pid
+	match = rt_graph_check_switch_to(MARGS, &dint, &dull)           ||
+		rt_graph_check_switch_away(MARGS, &dint,  &dull)        ||
+		rt_graph_check_task_release(MARGS, &dint, &dull, &dull) ||
+		rt_graph_check_task_completion(MARGS, &dint, &dull)     ||
+		rt_graph_check_task_block(MARGS, &dull)                 ||
+		rt_graph_check_task_resume(MARGS, &dull)		||
+		rt_graph_check_any(MARGS, &dull);
+#undef MARGS
+	return match && pid == match_pid;
 }
 
 struct record*
@@ -240,9 +224,6 @@ static int try_completion(struct graph_info *ginfo,
 		info->completion = TRUE;
 		info->ctime = ts;
 		info->clabel = rtt_info->label;
-		info->line = TRUE;
-		info->lcolor = hash_pid(record->cpu);
-		info->ltime = ts;
 		ret = 1;
 	}
 	return ret;
@@ -361,6 +342,65 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	return ret;
 }
 
+/*
+ * Return information for @time, returns @job, @release, @deadline, and @record.
+ * @job: Job number at this time
+ * @release: Job's release time
+ * @deadline: Job's deadline
+ * @record: Matching record
+ */
+static int get_time_info(struct graph_info *ginfo,
+			 struct rt_task_info *rtt_info,
+			 unsigned long long time,
+			 int *out_job,
+			 unsigned long long *out_release,
+			 unsigned long long *out_deadline,
+			 struct record **out_record)
+
+{
+	int pid, job, match, found_job = 0;
+	unsigned long long release, deadline;
+	struct record *record, *last_record;
+	struct rt_graph_info *rtg_info = &ginfo->rtinfo;
+
+	/* Seek CPUs to first record after this time */
+	*out_record = find_record(ginfo, rtt_info->base.pid, time);
+	if (!*out_record)
+		goto out;
+
+	last_record = *out_record;
+	last_record->ref_count++;
+
+	/* Read backwards for a release record */
+	while ((record = tracecmd_read_prev(ginfo->handle, last_record))) {
+		match = rt_graph_check_task_release(rtg_info, ginfo->pevent,
+						    record, &pid, &job,
+						    &release, &deadline);
+		free_record(last_record);
+		last_record = record;
+		if (match && pid == rtt_info->base.pid && release <= time) {
+			found_job = TRUE;
+			break;
+		}
+	}
+	free_record(last_record);
+
+	if (found_job) {
+		*out_job = job;
+		*out_release = release;
+		*out_deadline = deadline;
+	}
+ out:
+	return found_job;
+}
+
+static inline int in_res(struct graph_info *ginfo, unsigned long long time,
+			 unsigned long target)
+{
+	return  time > target - 2/ginfo->resolution &&
+		time < target + 2/ginfo->resolution;
+}
+
 static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			      struct record *record, struct plot_info *info)
 {
@@ -455,36 +495,46 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 			  struct trace_seq *s,
 			  unsigned long long time)
 {
-	int type;
+	const char *comm;
+	int show_dead, show_rel, pid, job, eid;
 	struct record *record;
 	struct event_format *event;
-	unsigned long sec, usec;
+	unsigned long usec, sec;
+	unsigned long long release, deadline, rts;
 	struct rt_task_info *rtt_info = plot->private;
 
-	record = find_record(ginfo, rtt_info->base.pid, time);
-	if (!record)
-		return 0;
+	get_time_info(ginfo, rtt_info, time,
+		      &job, &release, &deadline, &record);
+	show_rel  = in_res(ginfo, release, time);
+	show_dead = in_res(ginfo, deadline, time);
 
-	/* Display only if the record's time is close enough */
-	if (get_rts(ginfo, record) > time - 2/ginfo->resolution &&
-	    get_rts(ginfo, record) < time + 2/ginfo->resolution) {
+	/* Show real-time data about time */
+	pid = rtt_info->base.pid;
+	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
+	trace_seq_printf(s, "%s - %d:%d\n", comm, pid, job);
+	if (show_rel)
+		trace_seq_printf(s, "RELEASE\n");
+	if (show_dead)
+		trace_seq_printf(s, "DEADLINE\n");
 
-		type = pevent_data_type(ginfo->pevent, record);
-		event = pevent_data_event_from_type(ginfo->pevent, type);
-		if (event) {
-			trace_seq_puts(s, event->name);
-			trace_seq_putc(s, '\n');
-			pevent_event_info(s, event, record);
-			trace_seq_putc(s, '\n');
-		} else
-			trace_seq_printf(s, "UNKNOWN EVENT %d\n", type);
+	if (record) {
+		rts = get_rts(ginfo, record);
+		if (in_res(ginfo, rts, time)) {
+			eid = pevent_data_type(ginfo->pevent, record);
+			event = pevent_data_event_from_type(ginfo->pevent, eid);
+			if (event) {
+				trace_seq_puts(s, event->name);
+				trace_seq_putc(s, '\n');
+				pevent_event_info(s, event, record);
+				trace_seq_putc(s, '\n');
+			} else
+				trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
+		}
+		convert_nano(get_rts(ginfo, record), &sec, &usec);
+		trace_seq_printf(s, "%lu.%06lu CPU: %03d",
+				 sec, usec, record->cpu);
+		free_record(record);
 	}
-
-	/* Display a timestamp always */
-	convert_nano(get_rts(ginfo, record), &sec, &usec);
-	trace_seq_printf(s, "%lu.%06lu CPU: %03d",
-			 sec, usec, record->cpu);
-	free_record(record);
 
 	return 1;
 }

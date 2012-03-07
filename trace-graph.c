@@ -76,7 +76,7 @@ static int convert_time_to_x(struct graph_info *ginfo, guint64 time)
 		return 0;
 	return (time - ginfo->view_start_time) * ginfo->resolution;
 }
-
+r
 static guint64 convert_x_to_time(struct graph_info *ginfo, gint x)
 {
 	double d = x;

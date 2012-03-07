@@ -57,9 +57,9 @@ static struct format_field* add_ts_hash(struct ts_list **events, gint eid, gint 
  * @epid: set to the event's task PID
  * @rt_ts: set to the event's real-time timestamp
  */
-void rt_graph_check_any(struct rt_graph_info *rtinfo,
-			struct pevent *pevent, struct record *record,
-			gint *epid, unsigned long long *ts)
+int rt_graph_check_any(struct rt_graph_info *rtinfo,
+		       struct pevent *pevent, struct record *record,
+		       gint *epid, unsigned long long *ts)
 {
 	guint key, eid;
 	struct format_field *field;
@@ -76,6 +76,7 @@ void rt_graph_check_any(struct rt_graph_info *rtinfo,
 
 	dprintf(3, "Read (%d) record for task %d at %llu\n",
 		eid, *epid, *ts);
+	return 1;
 }
 
 /**
@@ -347,7 +348,7 @@ int rt_graph_check_task_block(struct rt_graph_info *rtinfo,
 }
 
 /**
- * rt_graph_check_task_release - check for litmus_task_release record
+ * rt_graph_check_task_resume - check for litmus_task_resume record
  * Return 1 and @pid if the record matches
  */
 int rt_graph_check_task_resume(struct rt_graph_info *rtinfo,
