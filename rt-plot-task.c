@@ -150,16 +150,18 @@ find_record(struct graph_info *ginfo, gint pid, guint64 time)
 /*
  * Update current job in @rtt_info, ensuring monotonic increase
  */
-static void update_job(struct rt_task_info *rtt_info, int job)
+static int update_job(struct rt_task_info *rtt_info, int job)
 {
 	if (job < rtt_info->last_job) {
-		die("Inconsistent job state for %d:%d -> %d\n",
+		printf("Inconsistent job state for %d:%d -> %d\n",
 		    rtt_info->base.pid, rtt_info->last_job, job);
+		return 0;
 	} else if (job > rtt_info->last_job) {
 		rtt_info->last_job = job;
 		snprintf(rtt_info->label, LLABEL, "%d:%d",
 			 rtt_info->base.pid, rtt_info->last_job);
 	}
+	return 1;
 }
 
 static int try_param(struct graph_info *ginfo, struct rt_task_info *rtt_info,
@@ -343,6 +345,55 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 }
 
 /*
+ * Find the information for the last release of @rtt_info on @cpu before @time.
+ * @min_ts: the minimum time stamp to parse
+ *
+ * Returns release record and @out_job, @out_release, and @out_deadline if a
+ * release was found after @mints matching @time.
+ */
+static struct record*
+get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
+		     int cpu,
+		     unsigned long long min_ts, unsigned long long time,
+		     int *out_job,
+		     unsigned long long *out_release,
+		     unsigned long long *out_deadline)
+{
+	int pid, job, match;
+	unsigned long long release, deadline;
+	struct record *last_record, *record, *ret = NULL;
+	struct rt_graph_info *rtg_info = &ginfo->rtinfo;
+
+	last_record = tracecmd_peek_data(ginfo->handle, cpu);
+	if (!last_record)
+		return NULL;
+	last_record->ref_count++;
+
+	while ((record = tracecmd_read_prev(ginfo->handle, last_record))) {
+		if (record->ts < min_ts) {
+			free_record(record);
+			goto out;
+		}
+		match = rt_graph_check_task_release(rtg_info, ginfo->pevent,
+						    record, &pid, &job,
+						    &release, &deadline);
+		free_record(last_record);
+		last_record = record;
+		if (match && (pid == rtt_info->base.pid) && release <= time) {
+			ret = record;
+			last_record = NULL;
+			*out_job = job;
+			*out_release = release;
+			*out_deadline = deadline;
+			break;
+		}
+	};
+ out:
+	free_record(last_record);
+	return ret;
+}
+
+/*
  * Return information for @time, returns @job, @release, @deadline, and @record.
  * @job: Job number at this time
  * @release: Job's release time
@@ -358,40 +409,36 @@ static int get_time_info(struct graph_info *ginfo,
 			 struct record **out_record)
 
 {
-	int pid, job, match, found_job = 0;
-	unsigned long long release, deadline;
-	struct record *record, *last_record;
-	struct rt_graph_info *rtg_info = &ginfo->rtinfo;
+	int cpu, job;
+	unsigned long long release, deadline, min_ts;
+	struct record *record;
+	struct offset_cache *offsets;
 
 	/* Seek CPUs to first record after this time */
 	*out_record = find_record(ginfo, rtt_info->base.pid, time);
 	if (!*out_record)
 		goto out;
 
-	last_record = *out_record;
-	last_record->ref_count++;
+	min_ts = time - 2*rtt_info->wcet;
+	*out_job = 0;
+	*out_release = 0;
+	*out_deadline = 0;
 
-	/* Read backwards for a release record */
-	while ((record = tracecmd_read_prev(ginfo->handle, last_record))) {
-		match = rt_graph_check_task_release(rtg_info, ginfo->pevent,
-						    record, &pid, &job,
-						    &release, &deadline);
-		free_record(last_record);
-		last_record = record;
-		if (match && pid == rtt_info->base.pid && release <= time) {
-			found_job = TRUE;
-			break;
+	offsets = save_offsets(ginfo);
+	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
+		record = get_previous_release(ginfo, rtt_info, cpu, min_ts,
+					      time, &job, &release, &deadline);
+		if (record && record->ts > min_ts) {
+			*out_job = job;
+			*out_release = release;
+			*out_deadline = deadline;
+			min_ts = record->ts;
 		}
+		free_record(record);
 	}
-	free_record(last_record);
-
-	if (found_job) {
-		*out_job = job;
-		*out_release = release;
-		*out_deadline = deadline;
-	}
+	restore_offsets(ginfo, offsets);
  out:
-	return found_job;
+	return (min_ts == 0);
 }
 
 static inline int in_res(struct graph_info *ginfo, unsigned long long time,
@@ -476,6 +523,7 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
 {
 	struct rt_task_info *rtt_info = plot->private;
+	printf("Destroying plot %d\n", rtt_info->base.pid);
 	free(rtt_info->label);
 	task_plot_destroy(ginfo, plot);
 }
@@ -485,8 +533,28 @@ static int rt_task_plot_display_last_event(struct graph_info *ginfo,
 				 struct trace_seq *s,
 				 unsigned long long time)
 {
-	trace_seq_printf(s, "Displaying last event at %llu\n",
-			 time);
+	int eid;
+	struct event_format *event;
+	struct record *record;
+	struct offset_cache *offsets;
+	struct rt_task_info *rtt_info = plot->private;
+
+	offsets = save_offsets(ginfo);
+	record = find_record(ginfo, rtt_info->base.pid, time);
+	restore_offsets(ginfo, offsets);
+	if (!record)
+		return 0;
+
+	eid = pevent_data_type(ginfo->pevent, record);
+	event = pevent_data_event_from_type(ginfo->pevent, eid);
+	if (event)
+		trace_seq_puts(s, event->name);
+	else
+		trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
+	trace_seq_putc(s, '\n');
+	trace_seq_printf(s, "CPU %d\n", record->cpu);
+	free_record(record);
+
 	return 1;
 }
 
@@ -502,9 +570,12 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 	unsigned long usec, sec;
 	unsigned long long release, deadline, rts;
 	struct rt_task_info *rtt_info = plot->private;
+	struct offset_cache *offsets;
 
+	offsets = save_offsets(ginfo);
 	get_time_info(ginfo, rtt_info, time,
 		      &job, &release, &deadline, &record);
+	restore_offsets(ginfo, offsets);
 	show_rel  = in_res(ginfo, release, time);
 	show_dead = in_res(ginfo, deadline, time);
 
@@ -586,6 +657,10 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	len = strlen(comm) + 100;
 	label = malloc_or_die(len);
 	snprintf(label, len, "*%s-%d", comm, pid);
+	rtt_info->pid = pid;
+
+	printf("Created plot for %s-%d / %d %p\n", comm, pid, rtt_info->base.pid,
+	       rtt_info);
 
 	plot = trace_graph_plot_insert(ginfo, pos, label, PLOT_TYPE_TASK,
 				       &rt_task_cb, rtt_info);

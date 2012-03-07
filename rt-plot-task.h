@@ -6,6 +6,8 @@
 struct rt_task_info {
 	struct task_plot_info	base;
 
+	int			pid;
+
 	unsigned long long	wcet;
 	unsigned long long	period;
 

@@ -1,7 +1,7 @@
 #include "rt-graph.h"
 #include "trace-hash.h"
 
-#define DEBUG_LEVEL	4
+#define DEBUG_LEVEL	0
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
