@@ -618,16 +618,50 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 	return 1;
 }
 
+static int rt_task_plot_match_time(struct graph_info *ginfo,
+				   struct graph_plot *plot,
+				   unsigned long long time)
+{
+	struct record *record = NULL;
+	struct rt_task_info *rtt_info = plot->private;
+	int next_cpu, match, ret;
+
+	set_cpus_to_time(ginfo, time);
+
+	do {
+		free_record(record);
+		record = tracecmd_read_next_data(ginfo->handle, &next_cpu);
+		if (!record)
+			return 0;
+		match = record_matches_pid(ginfo, record, rtt_info->base.pid);
+	} while ((!match && get_rts(ginfo, record) < time + 1) ||
+		 (match && get_rts(ginfo, record) < time));
+
+	if (record && get_rts(ginfo, record) == time)
+		ret = 1;
+	free_record(record);
+
+	return ret;
+}
+
+static struct record *
+rt_task_plot_find_record(struct graph_info *ginfo, struct graph_plot *plot,
+		      unsigned long long time)
+{
+	struct rt_task_info *rtt_info = plot->private;
+	return find_record(ginfo, rtt_info->base.pid, time);
+}
+
+
 static const struct plot_callbacks rt_task_cb = {
-	.plot_event		= rt_task_plot_event,
 	.start			= rt_task_plot_start,
 	.destroy		= rt_task_plot_destroy,
 
+	.plot_event		= rt_task_plot_event,
 	.display_last_event	= rt_task_plot_display_last_event,
 	.display_info		= rt_task_plot_display_info,
-
-	.match_time		= task_plot_match_time,
-	.find_record		= task_plot_find_record,
+	.match_time		= rt_task_plot_match_time,
+	.find_record		= rt_task_plot_find_record,
 };
 
 void rt_plot_task_update_callback(gboolean accept,
