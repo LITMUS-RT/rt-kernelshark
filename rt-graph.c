@@ -94,6 +94,8 @@ int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
 			      unsigned long long *period)
 {
 	struct event_format *event;
+	struct rt_task_params *params;
+	struct task_list *list;
 	unsigned long long val;
 	gint id;
 	int ret = 0;
@@ -127,7 +129,19 @@ int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
 		dprintf(3, "Read task_param (%d) record for task %d "
 			"(%llu, %llu)\n", id, *pid, *wcet, *period);
 
-		add_task_hash(rtg_info->tasks, *pid);
+		list = add_task_hash(rtg_info->tasks, *pid);
+		if (!list->data) {
+			/* If this pid is plotted, sections of time might later
+			 * be viewed which are after this _param event. In this
+			 * case, that plot would never read a _param event and
+			 * would not know about the task's wcet and deadline.
+			 * Store them with the task to avoid this issue.
+			 */
+			params = malloc_or_die(sizeof(*params));
+			params->wcet = *wcet;
+			params->period = *period;
+			list->data = params;
+		}
 
 		if (*period > rtg_info->max_period)
 			rtg_info->max_period = *period;

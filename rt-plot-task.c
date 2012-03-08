@@ -296,6 +296,7 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 					    &release, &deadline);
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, job);
+
 		info->release = TRUE;
 		info->rtime = release;
 
@@ -612,7 +613,7 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 	int pid, job, eid;
 	struct record *record;
 	struct event_format *event;
-	unsigned long usec, sec;
+	unsigned long long msec, nsec;
 	unsigned long long release, deadline, rts;
 	struct rt_task_info *rtt_info = plot->private;
 	struct offset_cache *offsets;
@@ -654,9 +655,9 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
 		}
 		trace_seq_putc(s, '\n');
-		convert_nano(time, &sec, &usec);
-		trace_seq_printf(s, "%lu.%06lu CPU: %03d",
-				 sec, usec, record->cpu);
+		nano_to_milli(time, &msec, &nsec);
+		trace_seq_printf(s, "%llu.%06llu ms CPU: %03d",
+				 msec, nsec, record->cpu);
 		free_record(record);
 	}
 
@@ -740,23 +741,35 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	struct rt_task_info *rtt_info;
+	struct rt_task_params *params;
 	struct graph_plot *plot;
+	struct task_list *list;
 	const char *comm;
+	unsigned long long wm, wn, pm, pn;
 	char *plot_label;
 	int len;
 
-	if (!find_task_list(rtg_info->tasks, pid))
+	list = find_task_list(rtg_info->tasks, pid);
+	if (!list)
 		die("Cannot create RT plot of non-RT task %d!\n", pid);
 
+	params = list->data;
+	if (!params)
+		die ("RT task %d added without RT params!\n", pid);
 	rtt_info = malloc_or_die(sizeof(*rtt_info));
 	rtt_info->pid = pid;
 	rtt_info->label = malloc_or_die(LLABEL);
+
+	nano_to_milli(params->wcet, &wm, &wn);
+	nano_to_milli(params->period, &pm, &pn);
 
 	/* Create plot */
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 	len = strlen(comm) + 100;
 	plot_label = malloc_or_die(len);
-	snprintf(plot_label, len, "*%s-%d", comm, pid);
+	snprintf(plot_label, len,
+		 "*%s-%d\n(%llu.%1llu, %llu.%1llu)",
+		 comm, pid, wm, wn, pm, pn);
 	plot = trace_graph_plot_insert(ginfo, pos, plot_label, PLOT_TYPE_RT_TASK,
 				       &rt_task_cb, rtt_info);
 	free(plot_label);

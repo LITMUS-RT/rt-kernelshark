@@ -46,6 +46,7 @@ struct task_list *add_task_hash(struct task_list **tasks, int pid)
 	list = malloc_or_die(sizeof(*list));
 	list->pid = pid;
 	list->next = tasks[key];
+	list->data = NULL;
 	tasks[key] = list;
 
 	return list;
@@ -63,6 +64,7 @@ void free_task_hash(struct task_list **tasks)
 		while (tasks[i]) {
 			list = tasks[i];
 			tasks[i] = list->next;
+			free(list->data);
 			free(list);
 		}
 	}

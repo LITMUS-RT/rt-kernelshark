@@ -10,6 +10,7 @@
 struct task_list {
 	struct task_list	*next;
 	gint			pid;
+	void			*data;
 };
 
 struct task_list* find_task_list(struct task_list **tasks, int pid);

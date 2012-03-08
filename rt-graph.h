@@ -12,6 +12,11 @@
 #define TS_HASH_SIZE 12
 struct ts_list;
 
+struct rt_task_params {
+	unsigned long long	wcet;
+	unsigned long long	period;
+};
+
 struct rt_graph_info {
 
 	/* List of all real-time tasks */
@@ -104,5 +109,13 @@ void set_cpu_to_rts(struct graph_info *ginfo,
 		    unsigned long long rt_target, int cpu);
 void set_cpus_to_rts(struct graph_info *ginfo,
 		     unsigned long long rt_target);
+
+static inline void nano_to_milli(unsigned long long time,
+				 unsigned long long *msec,
+				 unsigned long long *nsec)
+{
+	*msec = time / 1000000ULL;
+	*nsec = time % 1000000ULL;
+}
 
 #endif
