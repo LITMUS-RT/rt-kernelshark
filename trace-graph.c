@@ -1839,7 +1839,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
-static void draw_nonrt_plots(struct graph_info *ginfo)
+static void draw_ft_plots(struct graph_info *ginfo)
 {
 	gint cpu, pid;
 	struct record *record;
@@ -1860,7 +1860,7 @@ static void draw_nonrt_plots(struct graph_info *ginfo)
 		hash = trace_graph_plot_find_cpu(ginfo, cpu);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				if (list->plot->type == PLOT_TYPE_RT_TASK)
+				if (list->plot->time != TIME_TYPE_FT)
 					continue;
 				draw_plot(ginfo, list->plot, record);
 			}
@@ -1869,13 +1869,13 @@ static void draw_nonrt_plots(struct graph_info *ginfo)
 		hash = trace_graph_plot_find_task(ginfo, pid);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				if (list->plot->type == PLOT_TYPE_RT_TASK)
+				if (list->plot->time != TIME_TYPE_FT)
 					continue;
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
 		for (list = ginfo->all_recs; list; list = list->next) {
-			if (list->plot->type == PLOT_TYPE_RT_TASK)
+			if (list->plot->time != TIME_TYPE_FT)
 				continue;
 			draw_plot(ginfo, list->plot, record);
 		}
@@ -1900,7 +1900,7 @@ static void draw_rt_plots(struct graph_info *ginfo)
 			break;
 		}
 		for (list = ginfo->all_recs; list; list = list->next) {
-			if (list->plot->type != PLOT_TYPE_RT_TASK)
+			if (list->plot->time != TIME_TYPE_RT)
 				continue;
 			draw_plot(ginfo, list->plot, record);
 		}
@@ -1965,7 +1965,7 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		goto out;
 	}
 
-	draw_nonrt_plots(ginfo);
+	draw_ft_plots(ginfo);
 	draw_rt_plots(ginfo);
 
 out:

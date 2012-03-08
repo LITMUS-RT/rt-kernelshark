@@ -44,6 +44,11 @@ enum graph_plot_type {
 	PLOT_TYPE_RT_TASK,
 };
 
+enum plot_time_type {
+	TIME_TYPE_FT,
+	TIME_TYPE_RT
+};
+
 struct graph_plot;
 
 struct plot_info {
@@ -133,6 +138,7 @@ struct plot_callbacks {
 
 struct graph_plot {
 	enum graph_plot_type		type;
+	enum plot_time_type	        time;
 	int				pos;
 	char				*label;
 	const struct plot_callbacks	*cb;
@@ -337,12 +343,14 @@ void trace_graph_plot_init(struct graph_info *ginfo);
 struct graph_plot *trace_graph_plot_append(struct graph_info *ginfo,
 					   const char *label,
 					   enum graph_plot_type type,
+					   enum plot_time_type time,
 					   const struct plot_callbacks *cb,
 					   void *data);
 struct graph_plot *trace_graph_plot_insert(struct graph_info *ginfo,
 					   int pos,
 					   const char *label,
 					   enum graph_plot_type type,
+					   enum plot_time_type time,
 					   const struct plot_callbacks *cb,
 					   void *data);
 void trace_graph_plot_remove(struct graph_info *ginfo, struct graph_plot *plot);

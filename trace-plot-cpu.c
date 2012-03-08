@@ -469,6 +469,7 @@ static void add_cpu_plot(struct graph_info *ginfo, gint cpu)
 	snprintf(label, 100, "CPU %d", cpu);
 
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_CPU,
+				       TIME_TYPE_FT,
 				       &cpu_plot_cb, cpu_info);
 	trace_graph_plot_add_cpu(ginfo, plot, cpu);
 }

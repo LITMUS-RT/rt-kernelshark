@@ -836,6 +836,7 @@ void graph_plot_init_tasks(struct graph_info *ginfo)
 
 	snprintf(label, 100, "TASK %d", pid);
 	trace_graph_plot_insert(ginfo, 1, label, PLOT_TYPE_TASK,
+				TIME_TYPE_FT,
 				&task_plot_cb, task_info);
 }
 
@@ -858,6 +859,7 @@ void graph_plot_task(struct graph_info *ginfo, int pid, int pos)
 	label = malloc_or_die(len);
 	snprintf(label, len, "%s-%d", comm, pid);
 	plot = trace_graph_plot_insert(ginfo, pos, label, PLOT_TYPE_TASK,
+				       TIME_TYPE_RT,
 				       &task_plot_cb, task_info);
 	free(label);
 

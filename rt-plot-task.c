@@ -771,6 +771,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 		 "%s-%d\n(%llu.%1llu, %llu.%1llu)",
 		 comm, pid, wm, wn, pm, pn);
 	plot = trace_graph_plot_insert(ginfo, pos, plot_label, PLOT_TYPE_RT_TASK,
+				       TIME_TYPE_RT,
 				       &rt_task_cb, rtt_info);
 	free(plot_label);
 
