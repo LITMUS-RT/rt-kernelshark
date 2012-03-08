@@ -344,6 +344,14 @@ int trace_graph_plot_event(struct graph_info *ginfo,
 	info->box = FALSE;
 	info->bfill = TRUE;
 
+	info->blabel = NULL;
+	info->release = FALSE;
+	info->rlabel = NULL;
+	info->deadline = FALSE;
+	info->dlabel = NULL;
+	info->completion = FALSE;
+	info->clabel = NULL;
+
 	if (!plot->cb->plot_event)
 		return 0;
 

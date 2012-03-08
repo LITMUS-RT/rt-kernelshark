@@ -93,7 +93,7 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 static struct record*
 __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 {
-	int next_cpu, match, eid, is_sa = 0;
+	int next_cpu, match, eid, ignored= 0;
 	struct record *record = NULL;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
@@ -106,9 +106,15 @@ __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 		match = record_matches_pid(ginfo, record, pid);
 		if (display) {
 			eid = pevent_data_type(ginfo->pevent, record);
-			is_sa = (eid == rtg_info->switch_away_id);
+			ignored = (eid == rtg_info->switch_away_id ||
+				   eid == rtg_info->switch_to_id   ||
+				   eid == rtg_info->task_completion_id ||
+				   eid == rtg_info->task_block_id  ||
+				   eid == rtg_info->task_resume_id ||
+				   eid == rtg_info->task_release_id);
 		}
-	} while (!(get_rts(ginfo, record) > time && match && !is_sa));
+		ignored = ignored && eid == ginfo->event_sched_switch_id;
+	} while (!(get_rts(ginfo, record) > time && match && !ignored));
 
 	return record;
 }
@@ -358,12 +364,12 @@ static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	match = rt_graph_check_task_resume(&ginfo->rtg_info, ginfo->pevent,
 					   record, &pid, &ts);
 	if (match && pid == rtt_info->pid) {
-		/* info->box = TRUE; */
-		/* info->bcolor = 0x0; */
-		/* info->bfill = TRUE; */
-		/* info->bthin = TRUE; */
-		/* info->bstart = rtt_info->block_time; */
-		/* info->bend = ts; */
+		info->box = TRUE;
+		info->bcolor = 0x0;
+		info->bfill = TRUE;
+		info->bthin = TRUE;
+		info->bstart = rtt_info->block_time;
+		info->bend = ts;
 		rtt_info->fresh = FALSE;
 
 		rtt_info->block_time = 0ULL;
@@ -442,7 +448,8 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	my_pid = (pid == epid);
 	my_cpu = (rtt_info->run_time && record->cpu == rtt_info->run_cpu);
 	not_sa = (eid != ginfo->rtg_info.switch_away_id);
-	if (not_sa && (my_pid || my_cpu)) {
+	if (not_sa && (my_pid || my_cpu) &&
+	    eid != ginfo->event_sched_switch_id) {
 		info->line = TRUE;
 		info->lcolor = hash_pid(record->cpu);
 		info->ltime = ts;
@@ -469,6 +476,13 @@ static void do_plot_end(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		info->blabel = rtt_info->label;
 	} else if (rtt_info->block_time && rtt_info->block_cpu != NO_CPU) {
 		/* Blocking happened */
+		info->box = TRUE;
+		info->bcolor = 0x0;
+		info->bfill = TRUE;
+		info->bthin = TRUE;
+		info->bstart = rtt_info->block_time;
+		info->bend = ginfo->view_end_time;
+		rtt_info->fresh = FALSE;
 	} else if (rtt_info->fresh) {
 		/* Nothing happened!*/
 		record = next_box_record(ginfo, rtt_info,
@@ -484,6 +498,13 @@ static void do_plot_end(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 				info->bend = ginfo->view_end_time;
 			} else if (eid == rtg_info->task_resume_id) {
 				/* In a block */
+				info->box = TRUE;
+				info->bcolor = 0x0;
+				info->bfill = TRUE;
+				info->bthin = TRUE;
+				info->bstart = ginfo->view_start_time;
+				info->bend = ginfo->view_end_time;
+				rtt_info->fresh = FALSE;
 			}
 			free_record(record);
 		}
@@ -614,6 +635,16 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 	if (record) {
 		rts = get_rts(ginfo, record);
 		eid = pevent_data_type(ginfo->pevent, record);
+
+		if (in_res(ginfo, deadline, time)) {
+			trace_seq_printf(s, "litmus_deadline for %d:%d at %llu\n",
+					 pid, job, deadline);
+		}
+		if (in_res(ginfo, release, time)) {
+			trace_seq_printf(s, "litmus_release for %d:%d at %llu\n",
+					 pid, job, release);
+		}
+
 		if (in_res(ginfo, rts, time)) {
 			event = pevent_data_event_from_type(ginfo->pevent, eid);
 			if (event) {

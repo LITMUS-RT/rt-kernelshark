@@ -50,6 +50,8 @@
 
 #define PLOT_SIZE	10
 #define PLOT_BOX_SIZE	PLOT_SIZE
+#define PLOT_TRI_SIZE   PLOT_BOX_SIZE / 2
+#define PLOT_BTRI_SIZE  .75 * PLOT_BOX_SIZE
 #define PLOT_GIVE	2
 #define PLOT_BEGIN	80
 #define PLOT_SEP	50
@@ -1639,18 +1641,78 @@ static gint draw_plot_line(struct graph_info *ginfo, int i,
 static void draw_plot_box(struct graph_info *ginfo, int i,
 			  unsigned long long start,
 			  unsigned long long end,
-			  gboolean fill, GdkGC *gc)
+			  gboolean fill, gboolean thin,
+			  char *label, GdkGC *gc)
 {
 	gint x1;
 	gint x2;
+	gint y;
+	gint size;
 
 	x1 = convert_time_to_x(ginfo, start);
 	x2 = convert_time_to_x(ginfo, end);
 
+	size = (thin) ? PLOT_BOX_SIZE/4 : PLOT_BOX_SIZE;
+	y = PLOT_BOX_TOP(i) + (PLOT_BOX_SIZE - size)/2;
+
 	gdk_draw_rectangle(ginfo->curr_pixmap, gc,
 			   fill,
-			   x1, PLOT_BOX_TOP(i),
-			   x2 - x1, PLOT_BOX_SIZE);
+			   x1, y,
+			   x2 - x1, size);
+}
+
+static void draw_plot_release(struct graph_info *ginfo, int i,
+			      unsigned long long time, char *label, GdkGC *gc)
+{
+
+	int tbase = PLOT_TOP(i) + PLOT_TRI_SIZE;
+	int x = convert_time_to_x(ginfo, time);
+	GdkPoint tpoints[3];
+	tpoints[0].x = x;
+	tpoints[0].y = PLOT_TOP(i);
+	tpoints[1].x = x - PLOT_TRI_SIZE/2;
+	tpoints[1].y = tbase;
+	tpoints[2].x = x + PLOT_TRI_SIZE/2;
+	tpoints[2].y = tbase;
+
+	gdk_draw_line(ginfo->curr_pixmap, gc,
+		      x, tbase, x, PLOT_BOX_BOTTOM(i));
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
+}
+
+static void draw_plot_deadline(struct graph_info *ginfo, int i,
+			       unsigned long long time, char *label, GdkGC *gc)
+{
+	int tbase = PLOT_BOX_BOTTOM(i);
+	int x = convert_time_to_x(ginfo, time);
+	GdkPoint tpoints[3];
+	tpoints[0].x = x;
+	tpoints[0].y = tbase + PLOT_TRI_SIZE;
+	tpoints[1].x = x - PLOT_TRI_SIZE/2;
+	tpoints[1].y = tbase;
+	tpoints[2].x = x + PLOT_TRI_SIZE/2;
+	tpoints[2].y = tbase;
+
+	gdk_draw_line(ginfo->curr_pixmap, gc,
+		      x, PLOT_BOX_TOP(i), x, tbase);
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
+}
+
+static void draw_plot_completion(struct graph_info *ginfo, int i,
+				 unsigned long long time, char *label,
+				 GdkGC *gc)
+{
+	int tbase = PLOT_BOX_BOTTOM(i) + PLOT_BTRI_SIZE;
+	int x = convert_time_to_x(ginfo, time);
+	GdkPoint tpoints[3];
+	tpoints[0].x = x;
+	tpoints[0].y = tbase - PLOT_BTRI_SIZE;
+	tpoints[1].x = x - PLOT_BTRI_SIZE/2;
+	tpoints[1].y = tbase;
+	tpoints[2].x = x + PLOT_BTRI_SIZE/2;
+	tpoints[2].y = tbase;
+
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, TRUE, tpoints, 3);
 }
 
 static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
@@ -1686,8 +1748,36 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		}
 
 		draw_plot_box(ginfo, plot->pos, info.bstart, info.bend,
-			      info.bfill, plot->gc);
+			      info.bfill, info.bthin, info.blabel, plot->gc);
 	}
+
+	if (info.release) {
+		if (plot->last_color != 0) {
+			plot->last_color = 0;
+			set_color(ginfo->draw, plot->gc, plot->last_color);
+		}
+		draw_plot_release(ginfo, plot->pos,
+				  info.rtime, info.rlabel, plot->gc);
+	}
+
+	if (info.deadline) {
+		if (plot->last_color != 0) {
+			plot->last_color = 0;
+			set_color(ginfo->draw, plot->gc, plot->last_color);
+		}
+		draw_plot_deadline(ginfo, plot->pos,
+				   info.dtime, info.dlabel, plot->gc);
+	}
+
+	if (info.completion) {
+		if (plot->last_color != 0) {
+			plot->last_color = 0;
+			set_color(ginfo->draw, plot->gc, plot->last_color);
+		}
+		draw_plot_completion(ginfo, plot->pos,
+				     info.ctime, info.dlabel, plot->gc);
+	}
+
 
 	if (info.line) {
 		if (info.lcolor != plot->last_color) {
