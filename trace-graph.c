@@ -1638,16 +1638,36 @@ static gint draw_plot_line(struct graph_info *ginfo, int i,
 	return x;
 }
 
+static void draw_plot_label(struct graph_info *ginfo, char *label,
+			    gint x, gint y, gint max_width)
+{
+	PangoLayout *layout;
+	gint text_width, text_height;
+	static PangoFontDescription *font = NULL;
+
+	if (!font) {
+		font = pango_font_description_from_string("Sans 6");
+	}
+
+	layout = gtk_widget_create_pango_layout(ginfo->draw, label);
+	pango_layout_set_font_description(layout, font);
+	pango_layout_get_pixel_size(layout, &text_width, &text_height);
+
+	if (text_width <= max_width) {
+		gdk_draw_layout(ginfo->curr_pixmap,
+				ginfo->draw->style->black_gc,
+				x, y, layout);
+	}
+	g_object_unref(layout);
+}
+
 static void draw_plot_box(struct graph_info *ginfo, int i,
 			  unsigned long long start,
 			  unsigned long long end,
 			  gboolean fill, gboolean thin,
 			  char *label, GdkGC *gc)
 {
-	gint x1;
-	gint x2;
-	gint y;
-	gint size;
+	gint x1, x2, y, size;
 
 	x1 = convert_time_to_x(ginfo, start);
 	x2 = convert_time_to_x(ginfo, end);
@@ -1659,10 +1679,12 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 			   fill,
 			   x1, y,
 			   x2 - x1, size);
+	if (label)
+		draw_plot_label(ginfo, label, x1 + 1, y + 1, x2 - x1 - 2);
 }
 
 static void draw_plot_release(struct graph_info *ginfo, int i,
-			      unsigned long long time, char *label, GdkGC *gc)
+			      unsigned long long time, GdkGC *gc)
 {
 
 	int tbase = PLOT_TOP(i) + PLOT_TRI_SIZE;
@@ -1681,7 +1703,7 @@ static void draw_plot_release(struct graph_info *ginfo, int i,
 }
 
 static void draw_plot_deadline(struct graph_info *ginfo, int i,
-			       unsigned long long time, char *label, GdkGC *gc)
+			       unsigned long long time, GdkGC *gc)
 {
 	int tbase = PLOT_BOX_BOTTOM(i);
 	int x = convert_time_to_x(ginfo, time);
@@ -1699,8 +1721,7 @@ static void draw_plot_deadline(struct graph_info *ginfo, int i,
 }
 
 static void draw_plot_completion(struct graph_info *ginfo, int i,
-				 unsigned long long time, char *label,
-				 GdkGC *gc)
+				 unsigned long long time, GdkGC *gc)
 {
 	int tbase = PLOT_BOX_BOTTOM(i) + PLOT_BTRI_SIZE;
 	int x = convert_time_to_x(ginfo, time);
@@ -1748,7 +1769,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		}
 
 		draw_plot_box(ginfo, plot->pos, info.bstart, info.bend,
-			      info.bfill, info.bthin, info.blabel, plot->gc);
+		 	      info.bfill, info.bthin, info.blabel, plot->gc);
 	}
 
 	if (info.release) {
@@ -1756,8 +1777,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
 		}
-		draw_plot_release(ginfo, plot->pos,
-				  info.rtime, info.rlabel, plot->gc);
+		draw_plot_release(ginfo, plot->pos, info.rtime, plot->gc);
 	}
 
 	if (info.deadline) {
@@ -1765,8 +1785,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
 		}
-		draw_plot_deadline(ginfo, plot->pos,
-				   info.dtime, info.dlabel, plot->gc);
+		draw_plot_deadline(ginfo, plot->pos, info.dtime, plot->gc);
 	}
 
 	if (info.completion) {
@@ -1774,8 +1793,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
 		}
-		draw_plot_completion(ginfo, plot->pos,
-				     info.ctime, info.dlabel, plot->gc);
+		draw_plot_completion(ginfo, plot->pos, info.ctime, plot->gc);
 	}
 
 

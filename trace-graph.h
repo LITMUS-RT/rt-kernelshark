@@ -61,15 +61,12 @@ struct plot_info {
 
 	gboolean		release;
 	unsigned long long	rtime;
-	char			*rlabel;
 
 	gboolean		deadline;
 	unsigned long long	dtime;
-	char			*dlabel;
 
 	gboolean		completion;
 	unsigned long long	ctime;
-	char			*clabel;
 };
 
 /*

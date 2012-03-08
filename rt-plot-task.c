@@ -298,11 +298,9 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		update_job(rtt_info, job);
 		info->release = TRUE;
 		info->rtime = release;
-		info->rlabel = rtt_info->label;
 
 		info->deadline = TRUE;
 		info->dtime = deadline;
-		info->dlabel = rtt_info->label;
 
 		if (job <= 3)
 			rtt_info->first_rels[job - 1] = release;
@@ -328,7 +326,6 @@ static int try_completion(struct graph_info *ginfo,
 		update_job(rtt_info, job);
 		info->completion = TRUE;
 		info->ctime = ts;
-		info->clabel = rtt_info->label;
 		dprintf(3, "Completion for %d:%d on %d at %llu\n",
 			pid, job, record->cpu, ts);
 		ret = 1;
@@ -627,35 +624,37 @@ static int rt_task_plot_display_info(struct graph_info *ginfo,
 		      &job, &release, &deadline, &record);
 	restore_offsets(ginfo, offsets);
 
-	/* Show real-time data about time */
 	pid = rtt_info->pid;
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
-	trace_seq_printf(s, "%s - %d:%d\n", comm, pid, job);
+	trace_seq_printf(s, "%s-%d:%d\n", comm, pid, job);
 
 	if (record) {
 		rts = get_rts(ginfo, record);
 		eid = pevent_data_type(ginfo->pevent, record);
 
 		if (in_res(ginfo, deadline, time)) {
-			trace_seq_printf(s, "litmus_deadline for %d:%d at %llu\n",
+			trace_seq_printf(s, "\nlitmus_deadline\n"
+					 "deadline(job(%d,%d)): %llu\n",
 					 pid, job, deadline);
 		}
 		if (in_res(ginfo, release, time)) {
-			trace_seq_printf(s, "litmus_release for %d:%d at %llu\n",
+			trace_seq_printf(s, "\nlitmus_release\n"
+					 "release(job(%d,%d)): %llu\n",
 					 pid, job, release);
 		}
 
 		if (in_res(ginfo, rts, time)) {
 			event = pevent_data_event_from_type(ginfo->pevent, eid);
 			if (event) {
+				trace_seq_putc(s, '\n');
 				trace_seq_puts(s, event->name);
 				trace_seq_putc(s, '\n');
 				pevent_event_info(s, event, record);
-				trace_seq_putc(s, '\n');
 			} else
-				trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
+				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
 		}
-		convert_nano(get_rts(ginfo, record), &sec, &usec);
+		trace_seq_putc(s, '\n');
+		convert_nano(time, &sec, &usec);
 		trace_seq_printf(s, "%lu.%06lu CPU: %03d",
 				 sec, usec, record->cpu);
 		free_record(record);
