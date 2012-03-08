@@ -1272,15 +1272,15 @@ plot_rt_tasks_clicked (gpointer data)
 {
 	struct shark_info *info = data;
 	struct graph_info *ginfo = info->ginfo;
-	struct rt_graph_info *rtinfo;
+	struct rt_graph_info *rtg_info;
 	gint *selected;
 	gint *tasks;
 
 	if (!ginfo->handle)
 		return;
 
-	rtinfo = &ginfo->rtinfo;
-	tasks = task_list_pids(rtinfo->tasks);
+	rtg_info = &ginfo->rtg_info;
+	tasks = task_list_pids(rtg_info->tasks);
 	rt_plot_task_plotted(ginfo, &selected);
 
 	trace_task_dialog(ginfo->handle, tasks, selected,

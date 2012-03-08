@@ -246,7 +246,7 @@ struct graph_info {
 	struct format_field	*wakeup_new_pid_field;
 	struct format_field	*wakeup_new_success_field;
 
-	struct rt_graph_info	rtinfo;
+	struct rt_graph_info	rtg_info;
 
 	gboolean		read_comms;	/* Read all comms on first load */
 

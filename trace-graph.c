@@ -119,7 +119,7 @@ static void init_event_cache(struct graph_info *ginfo)
 	 */
 	ginfo->read_comms = TRUE;
 
-	init_rt_event_cache(&ginfo->rtinfo);
+	init_rt_event_cache(&ginfo->rtg_info);
 }
 
 struct filter_task_item *
@@ -1719,15 +1719,85 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
+static void draw_nonrt_plots(struct graph_info *ginfo)
+{
+	gint cpu, pid;
+	struct record *record;
+	struct plot_hash *hash;
+	struct plot_list *list;
+
+	tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
+					   ginfo->view_start_time);
+	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
+		if (record->ts < ginfo->view_start_time) {
+			free_record(record);
+			continue;
+		}
+		if (record->ts > ginfo->view_end_time) {
+			free_record(record);
+			break;
+		}
+		hash = trace_graph_plot_find_cpu(ginfo, cpu);
+		if (hash) {
+			for (list = hash->plots; list; list = list->next) {
+				if (list->plot->type == PLOT_TYPE_RT_TASK)
+					continue;
+				draw_plot(ginfo, list->plot, record);
+			}
+		}
+		pid = pevent_data_pid(ginfo->pevent, record);
+		hash = trace_graph_plot_find_task(ginfo, pid);
+		if (hash) {
+			for (list = hash->plots; list; list = list->next) {
+				if (list->plot->type == PLOT_TYPE_RT_TASK)
+					continue;
+				draw_plot(ginfo, list->plot, record);
+			}
+		}
+		for (list = ginfo->all_recs; list; list = list->next) {
+			if (list->plot->type == PLOT_TYPE_RT_TASK)
+				continue;
+			draw_plot(ginfo, list->plot, record);
+		}
+		free_record(record);
+	}
+}
+
+static void draw_rt_plots(struct graph_info *ginfo)
+{
+	gint cpu;
+	struct record *record;
+	struct plot_list *list;
+
+	set_cpus_to_rts(ginfo, ginfo->view_start_time);
+	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
+		if (get_rts(ginfo, record) < ginfo->view_start_time) {
+			free_record(record);
+			continue;
+		}
+		if (get_rts(ginfo, record) > ginfo->view_end_time) {
+			free_record(record);
+			break;
+		}
+		for (list = ginfo->all_recs; list; list = list->next) {
+			if (list->plot->type != PLOT_TYPE_RT_TASK)
+				continue;
+			draw_plot(ginfo, list->plot, record);
+		}
+		free_record(record);
+	}
+}
+
 static void draw_plots(struct graph_info *ginfo, gint new_width)
 {
 	struct plot_list *list;
 	struct graph_plot *plot;
 	struct record *record;
 	struct plot_hash *hash;
-	gint pid;
 	gint cpu;
 	gint i;
+
+	printf("----Drawing plots----\n");
 
 	/* Initialize plots */
 	for (i = 0; i < ginfo->plots; i++) {
@@ -1748,13 +1818,11 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		set_color(ginfo->draw, plot->gc, plot->last_color);
 	}
 
-	tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
-					   ginfo->view_start_time);
-
 	trace_set_cursor(GDK_WATCH);
-
 	/* Shortcut if we don't have any task plots */
 	if (!ginfo->nr_task_hash && !ginfo->all_recs) {
+		tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
+						   ginfo->view_start_time);
 		for (cpu = 0; cpu < ginfo->cpus; cpu++) {
 			hash = trace_graph_plot_find_cpu(ginfo, cpu);
 			if (!hash)
@@ -1777,30 +1845,8 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		goto out;
 	}
 
-	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
-		if (record->ts < ginfo->view_start_time) {
-			free_record(record);
-			continue;
-		}
-		if (record->ts > ginfo->view_end_time) {
-			free_record(record);
-			break;
-		}
-		hash = trace_graph_plot_find_cpu(ginfo, cpu);
-		if (hash) {
-			for (list = hash->plots; list; list = list->next)
-				draw_plot(ginfo, list->plot, record);
-		}
-		pid = pevent_data_pid(ginfo->pevent, record);
-		hash = trace_graph_plot_find_task(ginfo, pid);
-		if (hash) {
-			for (list = hash->plots; list; list = list->next)
-				draw_plot(ginfo, list->plot, record);
-		}
-		for (list = ginfo->all_recs; list; list = list->next)
-			draw_plot(ginfo, list->plot, record);
-		free_record(record);
-	}
+	draw_nonrt_plots(ginfo);
+	draw_rt_plots(ginfo);
 
 out:
 	for (i = 0; i < ginfo->plots; i++) {
@@ -2376,6 +2422,7 @@ void trace_graph_refresh(struct graph_info *ginfo)
 	ginfo->draw_height = PLOT_SPACE(ginfo->plots);
 	gtk_widget_set_size_request(ginfo->draw, ginfo->draw_width, ginfo->draw_height);
 	update_label_window(ginfo);
+	printf("----Redrawing graph----\n");
 	redraw_graph(ginfo);
 }
 

@@ -10,17 +10,18 @@ struct rt_task_info {
 
 	/* For drawing squares */
 	unsigned long long	run_time;
+	int			run_cpu;
 	unsigned long long	block_time;
+	int			block_cpu;
 
 	/* For managing state */
 	int			last_job;
-	int			last_cpu;
-	unsigned long long	last_time;
 
 	/* Used to get around bugs(ish) */
 	unsigned long long	first_rels[3];
 
 	gboolean		params_found;
+	gboolean		fresh;
 	char			*label;
 };
 

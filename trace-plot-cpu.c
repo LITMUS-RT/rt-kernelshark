@@ -89,7 +89,7 @@ static int filter_record(struct graph_info *ginfo,
 
 
 	/* Load real-time records */
-	rt_graph_check_task_param(&ginfo->rtinfo, ginfo->pevent, record,
+	rt_graph_check_task_param(&ginfo->rtg_info, ginfo->pevent, record,
 				  &rpid, &wcet, &period);
 
 	if (trace_graph_check_sched_switch(ginfo, record, sched_pid, &comm)) {
