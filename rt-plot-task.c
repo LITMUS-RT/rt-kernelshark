@@ -768,7 +768,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	len = strlen(comm) + 100;
 	plot_label = malloc_or_die(len);
 	snprintf(plot_label, len,
-		 "*%s-%d\n(%llu.%1llu, %llu.%1llu)",
+		 "%s-%d\n(%llu.%1llu, %llu.%1llu)",
 		 comm, pid, wm, wn, pm, pn);
 	plot = trace_graph_plot_insert(ginfo, pos, plot_label, PLOT_TYPE_RT_TASK,
 				       &rt_task_cb, rtt_info);
