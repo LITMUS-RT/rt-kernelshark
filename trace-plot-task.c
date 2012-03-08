@@ -713,10 +713,16 @@ static const struct plot_callbacks task_plot_cb = {
 	.destroy		= task_plot_destroy
 };
 
-
-void graph_tasks_plotted(struct graph_info *ginfo,
-			 enum task_plot_type type,
-			 gint **plotted)
+/**
+ * graph_plot_task_plotted - return what tasks are plotted
+ * @ginfo: the graph info structure
+ * @plotted: returns an allocated array of gints holding the pids.
+ *  the last pid is -1, NULL, if none are.
+ *
+ * @plotted must be freed with free() after this is called.
+ */
+void graph_plot_task_plotted(struct graph_info *ginfo,
+			     gint **plotted)
 {
 	struct task_plot_info *task_info;
 	struct graph_plot *plot;
@@ -733,21 +739,7 @@ void graph_tasks_plotted(struct graph_info *ginfo,
 	}
 }
 
-/**
- * graph_plot_task_plotted - return what tasks are plotted
- * @ginfo: the graph info structure
- * @plotted: returns an allocated array of gints holding the pids.
- *  the last pid is -1, NULL, if none are.
- *
- * @plotted must be freed with free() after this is called.
- */
-void graph_plot_task_plotted(struct graph_info *ginfo,
-			     gint **plotted)
-{
-	graph_tasks_plotted(ginfo, TASK_PLOT_LINUX, plotted);
-}
-
-void graph_tasks_update_callback(enum task_plot_type type,
+void graph_tasks_update_callback(enum graph_plot_type type,
 				 plot_task_cb plot_cb,
 				 gboolean accept,
 				 gint *selected,
@@ -778,12 +770,9 @@ void graph_tasks_update_callback(enum task_plot_type type,
 	 */
 	for (i = ginfo->plots - 1; i >= 0; i--) {
 		plot = ginfo->plot_array[i];
-		if (plot->type != PLOT_TYPE_TASK)
+		if (plot->type != type)
 			continue;
-
 		task_info = plot->private;
-		if (task_info->type != type)
-			continue;
 
 		/* If non are selected, then remove all */
 		if (!select_size) {
@@ -819,7 +808,7 @@ void graph_plot_task_update_callback(gboolean accept,
 				     gint *non_select,
 				     gpointer data)
 {
-	graph_tasks_update_callback(TASK_PLOT_LINUX, graph_plot_task,
+	graph_tasks_update_callback(PLOT_TYPE_TASK, graph_plot_task,
 				    accept, selected, non_select, data);
 }
 
@@ -850,17 +839,6 @@ void graph_plot_init_tasks(struct graph_info *ginfo)
 				&task_plot_cb, task_info);
 }
 
-void init_task_plot_info(struct graph_info *ginfo,
-			 struct task_plot_info *task_info,
-			 enum task_plot_type type,
-			 int pid)
-{
-	task_info->last_records =
-		malloc_or_die(sizeof(struct record *) * ginfo->cpus);
-	task_info->pid = pid;
-	task_info->type = type;
-}
-
 void graph_plot_task(struct graph_info *ginfo, int pid, int pos)
 {
 	struct task_plot_info *task_info;
@@ -870,8 +848,9 @@ void graph_plot_task(struct graph_info *ginfo, int pid, int pos)
 	int len;
 
 	task_info = malloc_or_die(sizeof(*task_info));
-
-	init_task_plot_info(ginfo, task_info, TASK_PLOT_LINUX, pid);
+	task_info->last_records =
+		malloc_or_die(sizeof(struct record *) * ginfo->cpus);
+	task_info->pid = pid;
 
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 

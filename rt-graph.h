@@ -65,7 +65,7 @@ struct ts_list {
 /* Event parsers */
 int rt_graph_check_any(struct rt_graph_info *rtinfo,
 		       struct pevent *pevent, struct record *record,
-		       gint *pid, unsigned long long *ts);
+		       gint *pid, gint *eid, unsigned long long *ts);
 int rt_graph_check_task_param(struct rt_graph_info *rtinfo, struct pevent *pevent,
 			      struct record *record, gint *pid,
 			      unsigned long long *wcet,
@@ -90,5 +90,15 @@ int rt_graph_check_task_resume(struct rt_graph_info *rtinfo, struct pevent *peve
 			       struct record *record, gint *pid,
 			       unsigned long long *when);
 void init_rt_event_cache(struct rt_graph_info *rtinfo);
+
+/* Methods for dealing with RT timestamps */
+unsigned long long get_rts(struct graph_info *ginfo,
+			   struct record *record);
+unsigned long long next_rts(struct graph_info *ginfo, int cpu,
+			    unsigned long long ft_target);
+void set_cpu_to_rts(struct graph_info *ginfo,
+		    unsigned long long rt_target, int cpu);
+void set_cpus_to_rts(struct graph_info *ginfo,
+		     unsigned long long rt_target);
 
 #endif

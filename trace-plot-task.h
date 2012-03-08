@@ -8,12 +8,7 @@
 struct graph_info;
 struct graph_plot;
 struct plot_info;
-
-enum task_plot_type {
-	TASK_PLOT_OTHER,
-	TASK_PLOT_LINUX,
-	TASK_PLOT_RT
-};
+enum graph_plot_type;
 
 /**
  * struct task_plot_info - information for plotting a single task
@@ -25,7 +20,6 @@ enum task_plot_type {
  * @display_wake_time: as above, but reset under some circumstances
  * @wake_color:
  * @last_cpu: cpu task is currently running on
- * @type: type of task plot
  */
 struct task_plot_info {
 	int			pid;
@@ -36,7 +30,6 @@ struct task_plot_info {
 	unsigned long long	display_wake_time;
 	int			wake_color;
 	int			last_cpu;
-	enum task_plot_type	type;
 };
 
 /* Querying records */
@@ -95,15 +88,10 @@ void graph_plot_init_tasks(struct graph_info *ginfo);
 
 /* Shared functionality for inheriting structs */
 typedef void (plot_task_cb)(struct graph_info *ginfo, int pid, int pos);
-void graph_tasks_update_callback(enum task_plot_type type,
+void graph_tasks_update_callback(enum graph_plot_type type,
 				 plot_task_cb plot_cb,
 				 gboolean accept,
 				 gint *selected,
 				 gint *non_select,
 				 gpointer data);
-void init_task_plot_info(struct graph_info *ginfo,
-			 struct task_plot_info *task_info,
-			 enum task_plot_type type, int pid);
-void graph_tasks_plotted(struct graph_info *ginfo, enum task_plot_type type,
-			 gint **plotted);
 #endif

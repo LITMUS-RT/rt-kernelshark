@@ -41,6 +41,7 @@ enum graph_plot_type {
 	PLOT_TYPE_OTHER,
 	PLOT_TYPE_CPU,
 	PLOT_TYPE_TASK,
+	PLOT_TYPE_RT_TASK,
 };
 
 struct graph_plot;

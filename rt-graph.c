@@ -1,7 +1,7 @@
-#include "rt-graph.h"
+#include "trace-graph.h"
 #include "trace-hash.h"
 
-#define DEBUG_LEVEL	0
+#define DEBUG_LEVEL	4
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -17,6 +17,9 @@ static guint get_event_hash_key(gint eid)
 	return trace_hash(eid) % TS_HASH_SIZE;
 }
 
+/*
+ * Returns cached field for @eid at @key.
+ */
 struct format_field* find_ts_hash(struct ts_list **events,
 				  gint key, gint eid)
 {
@@ -29,10 +32,11 @@ struct format_field* find_ts_hash(struct ts_list **events,
 }
 
 /*
- * Return format field for @eid, caching its location if this is the first try
+ * Return field for @eid at @key, caching if necessary.
  */
-static struct format_field* add_ts_hash(struct ts_list **events, gint eid, gint key,
-					struct pevent *pevent, struct record *record)
+static struct format_field*
+add_ts_hash(struct ts_list **events, gint eid, gint key,
+	    struct pevent *pevent, struct record *record)
 {
 	struct ts_list *list;
 	struct format_field *field;
@@ -59,16 +63,12 @@ static struct format_field* add_ts_hash(struct ts_list **events, gint eid, gint 
  */
 int rt_graph_check_any(struct rt_graph_info *rtinfo,
 		       struct pevent *pevent, struct record *record,
-		       gint *epid, unsigned long long *ts)
+		       gint *epid, gint *out_eid, unsigned long long *ts)
 {
 	guint key, eid;
 	struct format_field *field;
 
 	eid = pevent_data_type(pevent, record);
-
-	if (eid == rtinfo->switch_away_id)
-		return 0;
-
 	key = get_event_hash_key(eid);
 	field = find_ts_hash(rtinfo->events, key, eid);
 
@@ -80,6 +80,7 @@ int rt_graph_check_any(struct rt_graph_info *rtinfo,
 
 	dprintf(3, "Read (%d) record for task %d at %llu\n",
 		eid, *epid, *ts);
+	*out_eid = eid;
 	return 1;
 }
 
@@ -222,7 +223,7 @@ int rt_graph_check_switch_away(struct rt_graph_info *rtinfo,
 
 /**
  * rt_graph_check_task_release - check for litmus_task_release record
- * Return 1 and @pid, @job, and @deadline if the record matches
+ * Return 1 and @pid, @job, @release, and @deadline if the record matches
  */
 int rt_graph_check_task_release(struct rt_graph_info *rtinfo,
 				struct pevent *pevent, struct record *record,
@@ -271,7 +272,7 @@ int rt_graph_check_task_release(struct rt_graph_info *rtinfo,
 
 /**
  * rt_graph_check_task_completion - check for litmus_task_completion record
- * Return 1 and @pid, @job if the record matches
+ * Return 1 and @pid, @job, and @ts if the record matches
  */
 int rt_graph_check_task_completion(struct rt_graph_info *rtinfo,
 				   struct pevent *pevent, struct record *record,
@@ -314,7 +315,7 @@ int rt_graph_check_task_completion(struct rt_graph_info *rtinfo,
 
 /**
  * rt_graph_check_task_block - check for litmus_task_block record
- * Return 1 and @pid if the record matches
+ * Return 1, @pid, and @ts if the record matches
  */
 int rt_graph_check_task_block(struct rt_graph_info *rtinfo,
 			      struct pevent *pevent, struct record *record,
@@ -430,4 +431,120 @@ void init_rt_event_cache(struct rt_graph_info *rtinfo)
 
 	rtinfo->resume_pid_field = NULL;
 	rtinfo->resume_ts_field = NULL;
+}
+
+/**
+ * get_rts - extract real-time timestamp from a record
+ *
+ * This will only have to extract the timestamp once; after the time
+ * is extracted it will be cached in the record itself.
+ */
+unsigned long long
+get_rts(struct graph_info *ginfo, struct record *record)
+{
+	gint epid, eid;
+	unsigned long long ts;
+	if (!record->cached_rts) {
+		rt_graph_check_any(&ginfo->rtinfo, ginfo->pevent, record,
+				   &epid, &eid, &ts);
+		record->cached_rts = ts;
+	} else
+		ts = record->cached_rts;
+	return ts;
+}
+
+/**
+ * next_rts - find a real-time timestamp AROUND an FTRACE time
+ * @ginfo: Current state of the graph
+ * @cpu: CPU to search
+ * @ft_target: FTRACE time to seek towards
+ *
+ * Returns the RT time of a record CLOSELY BEFORE @ft_time.
+ */
+unsigned long long
+next_rts(struct graph_info *ginfo, int cpu, unsigned long long ft_target)
+{
+	struct record *record;
+	unsigned long long ts = 0ULL;
+	tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, ft_target);
+	record = tracecmd_read_data(ginfo->handle, cpu);
+	if (record) {
+		ts = get_rts(ginfo, record);
+		free_record(record);
+		return ts;
+	} else
+		return 0;
+}
+
+/**
+ * set_cpu_to_rts - seek CPU to a time closely preceding a real-time timestamp
+ * @ginfo: Current state o the graph
+ * @cpu: The CPU to seek
+ * @rt_target: RT time to seek towards
+ *
+ * This seeks to a real-time timestamp, not the default ftrace timestamps.
+ * The @cpu seek location will be placed before the given time, but will
+ * not necessarily be placed _right_ before the time.
+ */
+void
+set_cpu_to_rts(struct graph_info *ginfo, unsigned long long rt_target, int cpu)
+{
+	struct record *record;
+	unsigned long long last_rts, rts, seek_time, last_seek;
+	long long diff;
+
+	rts = next_rts(ginfo, cpu, rt_target);
+	diff = rt_target - rts;
+
+	/* "Guess" a new target based on difference */
+	seek_time = rt_target + diff;
+	rts = next_rts(ginfo, cpu, seek_time);
+	diff = rt_target - rts;
+
+	/* Zero in in 1.5x the difference increments */
+	if (rts && diff > 0) {
+		/*   rts      rt_target
+		 *   seek        ?
+		 * ---|---->>----|---
+		 */
+		do {
+			last_seek = seek_time;
+			last_rts = rts;
+			seek_time = seek_time + 1.5 * (rt_target - rts);
+			rts = next_rts(ginfo, cpu, seek_time);
+		} while (rts < rt_target && last_rts != rts);
+		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, last_seek);
+		seek_time = last_seek;
+	} else if (rts && diff < 0) {
+		/* rt_target    rts
+		 *    ?         seek
+		 * ---|----<<----|---
+		 */
+		do {
+			seek_time = seek_time - 1.5 * (rts - rt_target);
+			rts = next_rts(ginfo, cpu, seek_time);
+		} while (rts > rt_target);
+	}
+
+	/* Get to first record at or after time */
+	while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
+		if (get_rts(ginfo, record) >= rt_target)
+			break;
+		free_record(record);
+	}
+	if (record) {
+		tracecmd_set_cursor(ginfo->handle, cpu, record->offset);
+		free_record(record);
+	} else
+		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, seek_time);
+}
+
+/**
+ * set_cpus_to_time - seek all cpus to real-time @rt_target
+ */
+void set_cpus_to_rts(struct graph_info *ginfo, unsigned long long rt_target)
+{
+	int cpu;
+	for (cpu = 0; cpu < ginfo->cpus; cpu++)
+		set_cpu_to_rts(ginfo, rt_target, cpu);
 }

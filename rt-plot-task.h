@@ -4,17 +4,18 @@
 #include "trace-plot-task.h"
 
 struct rt_task_info {
-	struct task_plot_info	base;
-
 	int			pid;
 	unsigned long long	wcet;
 	unsigned long long	period;
 
+	/* For drawing squares */
 	unsigned long long	run_time;
 	unsigned long long	block_time;
 
+	/* For managing state */
 	int			last_job;
 	int			last_cpu;
+	unsigned long long	last_time;
 
 	/* Used to get around bugs(ish) */
 	unsigned long long	first_rels[3];
