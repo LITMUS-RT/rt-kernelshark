@@ -1846,6 +1846,7 @@ static void draw_ft_plots(struct graph_info *ginfo)
 	struct plot_hash *hash;
 	struct plot_list *list;
 
+
 	tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
 					   ginfo->view_start_time);
 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
@@ -1874,6 +1875,7 @@ static void draw_ft_plots(struct graph_info *ginfo)
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
+		int stuff = 0;
 		for (list = ginfo->all_recs; list; list = list->next) {
 			if (list->plot->time != TIME_TYPE_FT)
 				continue;

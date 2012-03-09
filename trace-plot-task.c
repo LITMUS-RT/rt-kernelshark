@@ -739,12 +739,10 @@ void graph_plot_task_plotted(struct graph_info *ginfo,
 	}
 }
 
-void graph_tasks_update_callback(enum graph_plot_type type,
-				 plot_task_cb plot_cb,
-				 gboolean accept,
-				 gint *selected,
-				 gint *non_select,
-				 gpointer data)
+void graph_plot_task_update_callback(gboolean accept,
+				     gint *selected,
+				     gint *non_select,
+				     gpointer data)
 {
 	struct graph_info *ginfo = data;
 	struct task_plot_info *task_info;
@@ -770,7 +768,7 @@ void graph_tasks_update_callback(enum graph_plot_type type,
 	 */
 	for (i = ginfo->plots - 1; i >= 0; i--) {
 		plot = ginfo->plot_array[i];
-		if (plot->type != type)
+		if (plot->type != PLOT_TYPE_TASK)
 			continue;
 		task_info = plot->private;
 
@@ -798,18 +796,9 @@ void graph_tasks_update_callback(enum graph_plot_type type,
 
 	/* Now add any plots that need to be added */
 	for (i = 0; i < select_size; i++)
-		plot_cb(ginfo, selected[i], ginfo->plots);
+		graph_plot_task(ginfo, selected[i], ginfo->plots);
 
 	trace_graph_refresh(ginfo);
-}
-
-void graph_plot_task_update_callback(gboolean accept,
-				     gint *selected,
-				     gint *non_select,
-				     gpointer data)
-{
-	graph_tasks_update_callback(PLOT_TYPE_TASK, graph_plot_task,
-				    accept, selected, non_select, data);
 }
 
 void graph_plot_init_tasks(struct graph_info *ginfo)

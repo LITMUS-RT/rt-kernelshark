@@ -86,12 +86,4 @@ void graph_plot_task_update_callback(gboolean accept,
 
 void graph_plot_init_tasks(struct graph_info *ginfo);
 
-/* Shared functionality for inheriting structs */
-typedef void (plot_task_cb)(struct graph_info *ginfo, int pid, int pos);
-void graph_tasks_update_callback(enum graph_plot_type type,
-				 plot_task_cb plot_cb,
-				 gboolean accept,
-				 gint *selected,
-				 gint *non_select,
-				 gpointer data);
 #endif

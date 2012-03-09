@@ -1245,6 +1245,25 @@ plot_cpu_clicked (gpointer data)
 	g_free(cpu_mask);
 }
 
+/* Callback for the clicked signal of the plot CPUs button */
+static void
+plot_rt_cpu_clicked (gpointer data)
+{
+	struct shark_info *info = data;
+	struct graph_info *ginfo = info->ginfo;
+	gboolean all_cpus;
+	guint64 *cpu_mask;
+
+	if (!ginfo->handle)
+		return;
+
+	rt_plot_cpus_plotted(ginfo, &all_cpus, &cpu_mask);
+
+	trace_filter_cpu_dialog(all_cpus, cpu_mask, ginfo->cpus,
+				rt_plot_cpus_update_callback, ginfo);
+	g_free(cpu_mask);
+}
+
 /* Callback for the clicked signal of the plot tasks button */
 static void
 plot_tasks_clicked (gpointer data)
@@ -1288,6 +1307,7 @@ plot_rt_tasks_clicked (gpointer data)
 	free(tasks);
 	free(selected);
 }
+
 
 /* Callback for the clicked signal of the help contents button */
 static void
@@ -2206,6 +2226,21 @@ void kernel_shark(int argc, char **argv)
 	/* We can attach the Quit menu item to our exit function */
 	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
 				  G_CALLBACK (plot_rt_tasks_clicked),
+				  (gpointer) info);
+
+	/* We do need to show menu items */
+	gtk_widget_show(sub_item);
+
+	/* --- Plot - RT CPUs Option --- */
+
+	sub_item = gtk_menu_item_new_with_label("Real-Time CPUs");
+
+	/* Add them to the menu */
+	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+
+	/* We can attach the Quit menu item to our exit function */
+	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
+				  G_CALLBACK (plot_rt_cpu_clicked),
 				  (gpointer) info);
 
 	/* We do need to show menu items */

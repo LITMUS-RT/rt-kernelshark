@@ -1,10 +1,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define LLABEL 30
-#define SEARCH_PERIODS 3
-
-#define DEBUG_LEVEL 3
+#define DEBUG_LEVEL 0
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -59,12 +56,10 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	max_ts = ginfo->view_end_time +
 		SEARCH_PERIODS * rtg_info->max_period;
 	set_cpus_to_rts(ginfo, time);
-	do {
-		free_record(record);
-		record = tracecmd_read_next_data(ginfo->handle, &cpu);
-		if (!record || get_rts(ginfo, record) > max_ts) {
+	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
+		if (get_rts(ginfo, record) > max_ts) {
 			free_record(record);
-			goto out;
+			break;
 		}
 
 		/* Sorry mother */
@@ -79,10 +74,10 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		if (eid && pid == rtt_info->pid) {
 			ret = record;
 			*out_eid = eid;
-			goto out;
+			break;
 		}
-	} while (get_rts(ginfo, record) < max_ts);
- out:
+		free_record(record);
+	};
 	return ret;
 }
 
@@ -561,8 +556,9 @@ static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *pl
 {
 	struct rt_task_info *rtt_info = plot->private;
 	dprintf(4,"%s\n", __FUNCTION__);
+	trace_graph_plot_remove_all_recs(ginfo, plot);
 	free(rtt_info->label);
-	task_plot_destroy(ginfo, plot);
+	free(rtt_info);
 }
 
 static int rt_task_plot_display_last_event(struct graph_info *ginfo,
@@ -716,8 +712,61 @@ void rt_plot_task_update_callback(gboolean accept,
 				  gint *non_select,
 				  gpointer data)
 {
-	graph_tasks_update_callback(PLOT_TYPE_RT_TASK, rt_plot_task,
-				    accept, selected, non_select, data);
+	struct graph_info *ginfo = data;
+	struct rt_task_info *rtt_info;
+	struct graph_plot *plot;
+	gint select_size = 0;
+	gint *ptr;
+	int i;
+
+	if (!accept)
+		return;
+
+	/* The selected and non_select are sorted */
+	if (selected) {
+		for (i = 0; selected[i] >= 0; i++)
+			;
+		select_size = i;
+	}
+
+	/*
+	 * Remove and add task plots.
+	 * Go backwards, since removing a plot shifts the
+	 * array from current position back.
+	 */
+	for (i = ginfo->plots - 1; i >= 0; i--) {
+		plot = ginfo->plot_array[i];
+		if (plot->type != PLOT_TYPE_RT_TASK)
+			continue;
+		rtt_info = plot->private;
+
+		/* If non are selected, then remove all */
+		if (!select_size) {
+			trace_graph_plot_remove(ginfo, plot);
+			continue;
+		}
+		ptr = bsearch(&rtt_info->pid, selected, select_size,
+			      sizeof(gint), id_cmp);
+		if (ptr) {
+			/*
+			 * This plot plot already exists, remove it
+			 * from the selected array.
+			 */
+			memmove(ptr, ptr + 1,
+				(unsigned long)(selected + select_size) -
+				(unsigned long)(ptr + 1));
+			select_size--;
+			continue;
+		}
+		/* Remove the plot */
+		trace_graph_plot_remove(ginfo, plot);
+	}
+
+	/* Now add any plots that need to be added */
+	for (i = 0; i < select_size; i++)
+		rt_plot_task(ginfo, selected[i], ginfo->plots);
+
+	trace_graph_refresh(ginfo);
 }
 
 void rt_plot_task_plotted(struct graph_info *ginfo, gint **plotted)
@@ -774,9 +823,5 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 				       TIME_TYPE_RT,
 				       &rt_task_cb, rtt_info);
 	free(plot_label);
-
-	printf("Created plot for %s-%d / %d %p\n", comm, pid, rtt_info->pid,
-	       rtt_info);
-
 	trace_graph_plot_add_all_recs(ginfo, plot);
 }

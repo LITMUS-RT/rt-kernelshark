@@ -5,6 +5,10 @@
 #include "task-list.h"
 #include "trace-cmd.h"
 #include "rt-plot-task.h"
+#include "rt-plot-cpu.h"
+
+#define LLABEL 30
+#define SEARCH_PERIODS 3
 
 #define NO_CPU -1
 
