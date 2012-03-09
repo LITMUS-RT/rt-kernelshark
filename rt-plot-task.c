@@ -93,11 +93,8 @@ __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
 	set_cpus_to_rts(ginfo, time);
-	do {
+	while ((record = tracecmd_read_next_data(ginfo->handle, &next_cpu))) {
 		free_record(record);
-		record = tracecmd_read_next_data(ginfo->handle, &next_cpu);
-		if (!record)
-			return NULL;
 		match = record_matches_pid(ginfo, record, pid);
 		if (display) {
 			eid = pevent_data_type(ginfo->pevent, record);
@@ -109,7 +106,9 @@ __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 				   eid == rtg_info->task_release_id);
 		}
 		ignored = ignored && eid == ginfo->event_sched_switch_id;
-	} while (!(get_rts(ginfo, record) > time && match && !ignored));
+		if (get_rts(ginfo, record) >= time && match && !ignored)
+			break;
+	};
 
 	return record;
 }
@@ -591,13 +590,6 @@ static int rt_task_plot_display_last_event(struct graph_info *ginfo,
 	free_record(record);
 
 	return 1;
-}
-
-static inline int in_res(struct graph_info *ginfo, unsigned long long time,
-			 unsigned long target)
-{
-	return  time > target - 2/ginfo->resolution &&
-		time < target + 2/ginfo->resolution;
 }
 
 static int rt_task_plot_display_info(struct graph_info *ginfo,

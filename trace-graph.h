@@ -433,5 +433,11 @@ static inline int hash_cpu(int cpu)
 	return trace_hash(cpu);
 }
 
+static inline int in_res(struct graph_info *ginfo, unsigned long long time,
+			 unsigned long target)
+{
+	return  time > target - 2/ginfo->resolution &&
+		time < target + 2/ginfo->resolution;
+}
 
 #endif /* _TRACE_GRAPH_H */
