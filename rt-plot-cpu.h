@@ -17,5 +17,6 @@ void rt_plot_cpus_update_callback(gboolean accept,
 				  gboolean all_cpus,
 				  guint64 *selected_cpu_mask,
 				  gpointer data);
+void rt_plot_init_cpus(struct graph_info *ginfo, int cpus);
 
 #endif

@@ -74,10 +74,16 @@ __find_record(struct graph_info *ginfo, int cpu, unsigned long long time,
 
 	while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
 		ignored = 0;
-		if (display) {
-			eid = pevent_data_type(ginfo->pevent, record);
+		eid = pevent_data_type(ginfo->pevent, record);
+
+		if (display)
 			ignored = !is_displayed(ginfo, eid);
-		}
+		else
+			/* Without this ignore, the info popup is going
+			 * to be sched_switchs almost always.
+			 */
+			ignored = (eid == ginfo->event_sched_switch_id);
+
 		if (get_rts(ginfo, record) >= time && !ignored)
 			break;
 		free_record(record);
@@ -342,11 +348,13 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		 * is_displayed will not work here or in any other methods.
 		 */
 #define ARG rtg_info, ginfo->pevent, record, &pid
+		rt_graph_check_task_param(ARG, &dull, &dull);
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
 		rt_graph_check_task_block(ARG, &dull);
 		rt_graph_check_task_resume(ARG, &dull);
 		rt_graph_check_any(ARG, &eid, &ts);
 #undef ARG
+
 		if (is_displayed(ginfo, eid)) {
 			info->line = TRUE;
 			info->lcolor = hash_pid(pid);
@@ -427,6 +435,8 @@ rt_cpu_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 				trace_seq_putc(s, '\n');
 				pevent_event_info(s, event, record);
 				trace_seq_putc(s, '\n');
+				if (!is_running)
+					trace_seq_putc(s, '\n');
 			} else
 				trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
 		}
@@ -554,9 +564,16 @@ void rt_plot_cpu(struct graph_info *ginfo, int cpu)
 	rtc_info->cpu = cpu;
 	rtc_info->label = malloc_or_die(LLABEL);
 
-	snprintf(label, 100, "*CPU %d", cpu);
+	snprintf(label, 100, "RT-CPU %d", cpu);
 
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_RT_CPU,
 				       TIME_TYPE_RT, &rt_cpu_cb, rtc_info);
 	trace_graph_plot_add_all_recs(ginfo, plot);
+}
+
+void rt_plot_init_cpus(struct graph_info *ginfo, int cpus)
+{
+	long cpu;
+	for (cpu = 0; cpu < cpus; cpu++)
+		rt_plot_cpu(ginfo, cpu);
 }

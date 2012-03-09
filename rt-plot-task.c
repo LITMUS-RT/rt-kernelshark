@@ -832,3 +832,12 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	free(plot_label);
 	trace_graph_plot_add_all_recs(ginfo, plot);
 }
+
+void rt_plot_add_all_tasks(struct graph_info *ginfo)
+{
+	gint *tasks;
+	int i;
+	tasks = task_list_pids(ginfo->rtg_info.tasks);
+	for (i = 0; tasks[i] != -1; i++)
+		rt_plot_task(ginfo, tasks[i], ginfo->plots);
+}

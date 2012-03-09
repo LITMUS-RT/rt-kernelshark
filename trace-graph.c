@@ -55,7 +55,7 @@
 #define PLOT_GIVE	2
 #define PLOT_BEGIN	80
 #define PLOT_SEP	50
-#define MAX_TRI_TIME    50000000
+#define MAX_TRI_TIME    20000000
 #define PLOT_LINE(plot) (PLOT_SEP * (plot) + PLOT_BEGIN + PLOT_SIZE)
 #define PLOT_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE * 2)
 #define PLOT_BOX_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE)
@@ -92,6 +92,12 @@ static int convert_dist_to_time(struct graph_info *ginfo, int dist)
 	return convert_x_to_time(ginfo, dist) - convert_x_to_time(ginfo, 0);
 }
 
+static int is_high_res(struct graph_info *ginfo)
+{
+	return convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME;
+}
+
+
 static void print_time(unsigned long long time)
 {
 	unsigned long sec, usec;
@@ -126,7 +132,6 @@ static void init_event_cache(struct graph_info *ginfo)
 	 * it into the pevent command line list.
 	 */
 	ginfo->read_comms = TRUE;
-
 	init_rt_event_cache(&ginfo->rtg_info);
 }
 
@@ -1642,7 +1647,7 @@ static gint draw_plot_line(struct graph_info *ginfo, int i,
 	/* y = (small) ? PLOT_BOX_TOP(i) : PLOT_TOP(i); */
 	y = PLOT_TOP(i);
 
-	if (!small || convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME) {
+	if (!small || is_high_res(ginfo)) {
 		gdk_draw_line(ginfo->curr_pixmap, gc,
 			      x, y, x, PLOT_BOTTOM(i));
 	}
@@ -1691,6 +1696,14 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 			   fill,
 			   x1, y,
 			   x2 - x1, size);
+	if (is_high_res(ginfo)) {
+		gdk_draw_rectangle(ginfo->curr_pixmap,
+				   ginfo->draw->style->black_gc,
+				   FALSE,
+				   x1, y,
+				   x2 - x1, size);
+	}
+
 	if (label)
 		draw_plot_label(ginfo, label, x1 + 1, y + 1, x2 - x1 - 2);
 }
@@ -1709,11 +1722,9 @@ static void draw_plot_release(struct graph_info *ginfo, int i,
 	tpoints[2].x = x + PLOT_TRI_SIZE/2;
 	tpoints[2].y = tbase;
 
-	if (convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME) {
-		gdk_draw_line(ginfo->curr_pixmap, gc,
-			      x, tbase, x, PLOT_BOX_BOTTOM(i));
-		gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
-	}
+	gdk_draw_line(ginfo->curr_pixmap, gc,
+		      x, tbase, x, PLOT_BOX_BOTTOM(i));
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
 }
 
 static void draw_plot_deadline(struct graph_info *ginfo, int i,
@@ -1729,11 +1740,9 @@ static void draw_plot_deadline(struct graph_info *ginfo, int i,
 	tpoints[2].x = x + PLOT_TRI_SIZE/2;
 	tpoints[2].y = tbase;
 
-	if (convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME) {
-		gdk_draw_line(ginfo->curr_pixmap, gc,
-			      x, PLOT_BOX_TOP(i), x, tbase);
-		gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
-	}
+	gdk_draw_line(ginfo->curr_pixmap, gc,
+		      x, PLOT_BOX_TOP(i), x, tbase);
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, FALSE, tpoints, 3);
 }
 
 static void draw_plot_completion(struct graph_info *ginfo, int i,
@@ -1749,9 +1758,7 @@ static void draw_plot_completion(struct graph_info *ginfo, int i,
 	tpoints[2].x = x + PLOT_BTRI_SIZE/2;
 	tpoints[2].y = tbase;
 
-	if (convert_dist_to_time(ginfo, PLOT_BTRI_SIZE) < MAX_TRI_TIME) {
-		gdk_draw_polygon(ginfo->curr_pixmap, gc, TRUE, tpoints, 3);
-	}
+	gdk_draw_polygon(ginfo->curr_pixmap, gc, TRUE, tpoints, 3);
 }
 
 static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
@@ -1790,7 +1797,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		 	      info.bfill, info.bthin, info.blabel, plot->gc);
 	}
 
-	if (info.release) {
+	if (info.release && is_high_res(ginfo)) {
 		if (plot->last_color != 0) {
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
@@ -1798,7 +1805,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		draw_plot_release(ginfo, plot->pos, info.rtime, plot->gc);
 	}
 
-	if (info.deadline) {
+	if (info.deadline && is_high_res(ginfo)) {
 		if (plot->last_color != 0) {
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
@@ -1806,7 +1813,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		draw_plot_deadline(ginfo, plot->pos, info.dtime, plot->gc);
 	}
 
-	if (info.completion) {
+	if (info.completion && is_high_res(ginfo)) {
 		if (plot->last_color != 0) {
 			plot->last_color = 0;
 			set_color(ginfo->draw, plot->gc, plot->last_color);
@@ -1923,8 +1930,6 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 	struct plot_hash *hash;
 	gint cpu;
 	gint i;
-
-	printf("----Drawing plots----\n");
 
 	/* Initialize plots */
 	for (i = 0; i < ginfo->plots; i++) {
@@ -2502,7 +2507,7 @@ static int load_handle(struct graph_info *ginfo,
 	ginfo->start_time = -1ULL;
 	ginfo->end_time = 0;
 
-	graph_plot_init_cpus(ginfo, ginfo->cpus);
+	rt_plot_init_cpus(ginfo, ginfo->cpus);
 
 	ginfo->draw_height = PLOT_SPACE(ginfo->plots);
 
@@ -2549,7 +2554,6 @@ void trace_graph_refresh(struct graph_info *ginfo)
 	ginfo->draw_height = PLOT_SPACE(ginfo->plots);
 	gtk_widget_set_size_request(ginfo->draw, ginfo->draw_width, ginfo->draw_height);
 	update_label_window(ginfo);
-	printf("----Redrawing graph----\n");
 	redraw_graph(ginfo);
 }
 

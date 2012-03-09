@@ -29,4 +29,6 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos);
 void rt_plot_tasks_plotted(struct graph_info *ginfo, gint **plotted);
 void rt_plot_task_update_callback(gboolean accept, gint *selected,
 				  gint *non_select, gpointer data);
+void rt_plot_add_all_tasks(struct graph_info *ginfo);
+
 #endif

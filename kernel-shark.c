@@ -1308,6 +1308,15 @@ plot_rt_tasks_clicked (gpointer data)
 	free(selected);
 }
 
+static void
+show_all_rt_clicked (gpointer data)
+{
+	struct shark_info *info = data;
+	struct graph_info *ginfo = info->ginfo;
+	rt_plot_add_all_tasks(ginfo);
+	trace_graph_refresh(ginfo);
+}
+
 
 /* Callback for the clicked signal of the help contents button */
 static void
@@ -2015,6 +2024,8 @@ void kernel_shark(int argc, char **argv)
 	gtk_widget_show(sub_item);
 
 
+
+
 	/* --- Filter - Graph Tasks Option --- */
 
 	sub_item = gtk_menu_item_new_with_label("tasks");
@@ -2226,6 +2237,21 @@ void kernel_shark(int argc, char **argv)
 	/* We can attach the Quit menu item to our exit function */
 	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
 				  G_CALLBACK (plot_rt_tasks_clicked),
+				  (gpointer) info);
+
+	/* We do need to show menu items */
+	gtk_widget_show(sub_item);
+
+	/* --- Plot - All RT Tasks Option --- */
+
+	sub_item = gtk_menu_item_new_with_label("Show All Real-Time Tasks");
+
+	/* Add them to the menu */
+	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+
+	/* We can attach the Quit menu item to our exit function */
+	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
+				  G_CALLBACK (show_all_rt_clicked),
 				  (gpointer) info);
 
 	/* We do need to show menu items */

@@ -1,7 +1,7 @@
 #include "trace-graph.h"
 #include "trace-hash.h"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 3
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -86,17 +86,17 @@ int rt_graph_check_any(struct rt_graph_info *rtg_info,
 
 /**
  * rt_graph_check_task_param - check for litmus_task_param record
- * Return 1 and @pid, @wcet, and @period if the record matches
+ * Return 1 and @pid, @out_wcet, and @out_period if the record matches
  */
 int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
 			      struct pevent *pevent, struct record *record,
-			      gint *pid, unsigned long long *wcet,
-			      unsigned long long *period)
+			      gint *pid, unsigned long long *out_wcet,
+			      unsigned long long *out_period)
 {
 	struct event_format *event;
 	struct rt_task_params *params;
 	struct task_list *list;
-	unsigned long long val;
+	unsigned long long val, wcet, period;
 	gint id;
 	int ret = 0;
 
@@ -122,12 +122,12 @@ int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
 					 record->data, &val);
 		*pid = val;
 		pevent_read_number_field(rtg_info->param_wcet_field,
-					 record->data, wcet);
+					 record->data, &wcet);
 		pevent_read_number_field(rtg_info->param_period_field,
-					 record->data, period);
+					 record->data, &period);
 		ret = 1;
 		dprintf(3, "Read task_param (%d) record for task %d "
-			"(%llu, %llu)\n", id, *pid, *wcet, *period);
+			"(%llu, %llu)\n", id, *pid, wcet, period);
 
 		list = add_task_hash(rtg_info->tasks, *pid);
 		if (!list->data) {
@@ -138,13 +138,15 @@ int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
 			 * Store them with the task to avoid this issue.
 			 */
 			params = malloc_or_die(sizeof(*params));
-			params->wcet = *wcet;
-			params->period = *period;
+			params->wcet = wcet;
+			params->period = period;
 			list->data = params;
 		}
 
-		if (*period > rtg_info->max_period)
-			rtg_info->max_period = *period;
+		if (period > rtg_info->max_period)
+			rtg_info->max_period = period;
+		*out_wcet = wcet;
+		*out_period = period;
 	}
  out:
 	return ret;
