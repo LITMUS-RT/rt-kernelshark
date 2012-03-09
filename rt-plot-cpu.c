@@ -79,16 +79,17 @@ try_switch_away(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 					   record, &pid, &job, &ts);
 	if (match) {
 		update_pid(rtc_info, pid);
-		if (rtc_info->run_time && rtc_info->run_time < ts) {
+		if (rtc_info->rt_run_time && rtc_info->rt_run_time < ts) {
 			info->box = TRUE;
 			info->bcolor = hash_pid(rtc_info->run_pid);
 			info->bfill = TRUE;
-			info->bstart = rtc_info->run_time;
+			info->bstart = rtc_info->rt_run_time;
 			info->bend = ts;
 			info->blabel = rtc_info->label;
 		}
 		rtc_info->run_pid = 0;
-		rtc_info->run_time = 0Ull;
+		rtc_info->rt_run_time = 0Ull;
+		rtc_info->reg_run_time = 0ULL;
 	}
 	return match;
 }
@@ -104,7 +105,8 @@ try_switch_to(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 					 record, &pid, &job, &ts);
 	if (match) {
 		update_pid(rtc_info, pid);
-		rtc_info->run_time = ts;
+		rtc_info->rt_run_time = ts;
+		rtc_info->reg_run_time = 0ULL;
 	}
 	return match;
 }
@@ -125,17 +127,49 @@ try_completion(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	return match;
 }
 
+static int
+try_sched_switch(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
+		 struct record *record, struct plot_info *info)
+{
+	const char *comm;
+	int from_pid, to_pid, match;
+
+	match = trace_graph_check_sched_switch(ginfo, record, &to_pid, &comm);
+	if (match) {
+		from_pid = pevent_data_pid(ginfo->pevent, record);
+		/* Only draw if no real-time task is running */
+		if (!rtc_info->rt_run_time) {
+			if (rtc_info->reg_run_time &&
+			    rtc_info->reg_run_time < get_rts(ginfo, record)) {
+				/* A non-rt task was running */
+				info->box = TRUE;
+				info->bthin = TRUE;
+				info->bcolor = 0x0;
+				/* info->blabel = rtc_info->label; */
+				info->bstart = rtc_info->reg_run_time;
+				info->bend = get_rts(ginfo, record);
+			}
+			if (to_pid)
+				rtc_info->reg_run_time = get_rts(ginfo, record);
+			else
+				rtc_info->reg_run_time = 0ULL;
+		}
+		update_pid(rtc_info, to_pid);
+	}
+	return match;
+}
+
 static void do_plot_end(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 			struct plot_info *info)
 {
 	int pid;
 	struct record *record;
 
-	if (rtc_info->run_time && rtc_info->run_pid) {
+	if (rtc_info->rt_run_time && rtc_info->run_pid) {
 		info->box = TRUE;
 		info->bcolor = hash_pid(rtc_info->run_pid);
 		info->bfill = TRUE;
-		info->bstart = rtc_info->run_time;
+		info->bstart = rtc_info->rt_run_time;
 		info->bend = ginfo->view_end_time;
 		info->blabel = rtc_info->label;
 		rtc_info->fresh = FALSE;
@@ -163,7 +197,7 @@ static int rt_cpu_plot_match_time(struct graph_info *ginfo,
 {
 	int ret = 0;
 	struct rt_cpu_info *rtc_info = plot->private;
-	struct record = find_record(ginfo, rtc_info->cpu, time);
+	struct record *record = find_record(ginfo, rtc_info->cpu, time);
 
 	if (record && get_rts(ginfo, record) == time)
 		ret = 1;
@@ -177,7 +211,8 @@ static void rt_cpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 {
 	struct rt_cpu_info *rtc_info = plot->private;
 
-	rtc_info->run_time = time;
+	rtc_info->rt_run_time = time;
+	rtc_info->reg_run_time = time;
 	rtc_info->run_pid = 0;
 	rtc_info->fresh = TRUE;
 }
@@ -189,7 +224,6 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 	unsigned long long ts;
 	struct rt_cpu_info *rtc_info = plot->private;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
-	const char *comm;
 
 	if (!record) {
 		do_plot_end(ginfo, rtc_info, info);
@@ -202,8 +236,8 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 	match = try_switch_away(ginfo, rtc_info, record, info) ||
 		try_switch_to(ginfo, rtc_info, record, info)   ||
 		try_completion(ginfo, rtc_info, record, info)  ||
-		trace_graph_check_sched_switch(ginfo, record,
-					       &pid, &comm);
+		try_sched_switch(ginfo, rtc_info, record, info);
+
 	if (!match) {
 		rt_graph_check_any(rtg_info, ginfo->pevent, record,
 				   &pid, &eid, &ts);

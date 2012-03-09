@@ -3,8 +3,9 @@
 
 struct rt_cpu_info {
 	int			cpu;
-	unsigned long long	run_time;
 	int			run_pid;
+	unsigned long long	rt_run_time;
+	unsigned long long	reg_run_time;
 	gboolean 		fresh;
 	char			*label;
 };

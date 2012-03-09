@@ -1875,7 +1875,6 @@ static void draw_ft_plots(struct graph_info *ginfo)
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
-		int stuff = 0;
 		for (list = ginfo->all_recs; list; list = list->next) {
 			if (list->plot->time != TIME_TYPE_FT)
 				continue;

@@ -29,6 +29,10 @@
 #include "rt-graph.h"
 #include "trace-plot-task.h"
 
+
+#define RED 0xff
+#define GREEN (0xff<<16)
+
 struct graph_info;
 
 typedef void (graph_select_cb)(struct graph_info *ginfo, guint64 time);
