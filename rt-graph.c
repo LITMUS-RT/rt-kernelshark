@@ -157,9 +157,9 @@ int rt_graph_check_task_param(struct rt_graph_info *rtg_info,
  * Return 1 and @pid, @job, and @ts if the record matches
  */
 int rt_graph_check_switch_to(struct rt_graph_info *rtg_info,
-				  struct pevent *pevent, struct record *record,
-				  gint *pid, gint *job,
-				  unsigned long long *ts)
+			     struct pevent *pevent, struct record *record,
+			     gint *pid, gint *job,
+			     unsigned long long *ts)
 {
 	struct event_format *event;
 	unsigned long long val;

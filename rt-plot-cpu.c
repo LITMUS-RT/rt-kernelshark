@@ -78,11 +78,6 @@ __find_record(struct graph_info *ginfo, int cpu, unsigned long long time,
 
 		if (display)
 			ignored = !is_displayed(ginfo, eid);
-		else
-			/* Without this ignore, the info popup is going
-			 * to be sched_switchs almost always.
-			 */
-			ignored = (eid == ginfo->event_sched_switch_id);
 
 		if (get_rts(ginfo, record) >= time && !ignored)
 			break;
@@ -138,13 +133,14 @@ static int get_time_info(struct graph_info *ginfo,
 	struct record *record;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	unsigned long long dull, max_ts;
+	const char *comm;
 	int cpu, is_running, pid, job;
 
 	cpu = rtc_info->cpu;
 	*out_pid = *out_job = is_running = 0;
 
+	*out_record = find_display_record(ginfo, cpu, time);
 	record = find_record(ginfo, cpu, time);
-	*out_record = record;
 	if (!record)
 		goto out;
 
@@ -154,14 +150,22 @@ static int get_time_info(struct graph_info *ginfo,
 			break;
 
 #define ARG rtg_info, ginfo->pevent, record, &pid, &job, &dull
-		if (rt_graph_check_switch_to(ARG)) {
-			/* Nothing is running */
+		if (rt_graph_check_switch_to(ARG) && pid) {
 			goto out;
-		} else if (rt_graph_check_switch_away(ARG)) {
+		} else if (rt_graph_check_switch_away(ARG) && pid) {
 			is_running = 1;
 			*out_pid = pid;
 			*out_job = job;
 			goto out;
+		} else if (trace_graph_check_sched_switch(ginfo, record,
+							  &pid, &comm)) {
+			pid = pevent_data_pid(ginfo->pevent, record);
+			if (pid) {
+				*out_pid = pid;
+				*out_job = 0;
+				is_running = 1;
+				goto out;
+			}
 		}
 		if (*out_record != record)
 			free_record(record);
@@ -182,6 +186,7 @@ try_switch_away(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 
 	match = rt_graph_check_switch_away(&ginfo->rtg_info, ginfo->pevent,
 					   record, &pid, &job, &ts);
+	match = match && pid;
 	if (match) {
 		update_pid(rtc_info, pid);
 		if (rtc_info->rt_run_time && rtc_info->rt_run_time < ts &&
@@ -209,6 +214,8 @@ try_switch_to(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 
 	match = rt_graph_check_switch_to(&ginfo->rtg_info, ginfo->pevent,
 					 record, &pid, &job, &ts);
+	match = match && pid;
+
 	if (match) {
 		update_pid(rtc_info, pid);
 		rtc_info->rt_run_time = ts;
@@ -246,7 +253,8 @@ try_sched_switch(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 		/* Only draw if no real-time task is running */
 		if (!rtc_info->rt_run_time) {
 			if (rtc_info->reg_run_time &&
-			    rtc_info->reg_run_time < get_rts(ginfo, record)) {
+			    rtc_info->reg_run_time < get_rts(ginfo, record) &&
+			    from_pid) {
 				/* A non-rt task was running */
 				info->box = TRUE;
 				info->bthin = TRUE;

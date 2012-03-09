@@ -1644,7 +1644,6 @@ static gint draw_plot_line(struct graph_info *ginfo, int i,
 	gint y;
 
 	x = convert_time_to_x(ginfo, time);
-	/* y = (small) ? PLOT_BOX_TOP(i) : PLOT_TOP(i); */
 	y = PLOT_TOP(i);
 
 	if (!small || is_high_res(ginfo)) {
@@ -1696,7 +1695,7 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 			   fill,
 			   x1, y,
 			   x2 - x1, size);
-	if (is_high_res(ginfo)) {
+	if (!thin && is_high_res(ginfo)) {
 		gdk_draw_rectangle(ginfo->curr_pixmap,
 				   ginfo->draw->style->black_gc,
 				   FALSE,
