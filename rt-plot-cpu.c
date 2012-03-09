@@ -12,6 +12,9 @@
 #define dprintf(l, x...)	do { if (0) printf(x); } while (0)
 #endif
 
+/*
+ * Return the next switch_away record after @time.
+ */
 static struct record*
 next_sa_record(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	       unsigned long long time, int *out_pid)
@@ -44,6 +47,9 @@ next_sa_record(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	return ret;
 }
 
+/*
+ * Return 1 if the name of @eid is displayed in the plot.
+ */
 static inline int
 is_displayed(struct graph_info *ginfo, int eid)
 {
@@ -79,19 +85,27 @@ __find_record(struct graph_info *ginfo, int cpu, unsigned long long time,
 	return record;
 }
 
+/*
+ * Return the first record after @time on @cpu.
+ */
 static inline struct record*
 find_record(struct graph_info *ginfo, int cpu, guint64 time)
 {
 	return __find_record(ginfo, cpu, time, 0);
 }
 
+/*
+ * Return the first _displayed_ record after @time on @cpu.
+ */
 static inline struct record*
 find_display_record(struct graph_info *ginfo, int cpu, guint64 time)
 {
 	return __find_record(ginfo, cpu, time, 1);
 }
 
-
+/*
+ * Update fields in @rtc_info for the new @pid.
+ */
 static void update_pid(struct rt_cpu_info *rtc_info, int pid)
 {
 	rtc_info->fresh = FALSE;
@@ -99,6 +113,58 @@ static void update_pid(struct rt_cpu_info *rtc_info, int pid)
 		rtc_info->run_pid = pid;
 		snprintf(rtc_info->label, LLABEL, "%d", rtc_info->run_pid);
 	}
+}
+
+/*
+ * Get information about the given @time.
+ * @out_pid: The running pid at @time
+ * @out_job: The running job at @time
+ * @out_record: The record at @time
+ *
+ * Return 1, @out_pid, and @out_job if the CPU is running at @time.
+ */
+static int get_time_info(struct graph_info *ginfo,
+			 struct rt_cpu_info *rtc_info,
+			 unsigned long long time,
+			 int *out_pid, int *out_job,
+			 struct record **out_record)
+{
+	struct record *record;
+	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+	unsigned long long dull, max_ts;
+	int cpu, is_running, pid, job;
+
+	cpu = rtc_info->cpu;
+	*out_pid = *out_job = is_running = 0;
+
+	record = find_record(ginfo, cpu, time);
+	*out_record = record;
+	if (!record)
+		goto out;
+
+	max_ts = time + SEARCH_PERIODS * rtg_info->max_period;
+	do {
+		if (get_rts(ginfo, record) > max_ts)
+			break;
+
+#define ARG rtg_info, ginfo->pevent, record, &pid, &job, &dull
+		if (rt_graph_check_switch_to(ARG)) {
+			/* Nothing is running */
+			goto out;
+		} else if (rt_graph_check_switch_away(ARG)) {
+			is_running = 1;
+			*out_pid = pid;
+			*out_job = job;
+			goto out;
+		}
+		if (*out_record != record)
+			free_record(record);
+#undef ARG
+	} while ((record = tracecmd_read_data(ginfo->handle, cpu)));
+ out:
+	if (*out_record != record)
+		free_record(record);
+	return is_running;
 }
 
 static int
@@ -179,7 +245,6 @@ try_sched_switch(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 				info->box = TRUE;
 				info->bthin = TRUE;
 				info->bcolor = 0x0;
-				/* info->blabel = rtc_info->label; */
 				info->bstart = rtc_info->reg_run_time;
 				info->bend = get_rts(ginfo, record);
 			}
@@ -274,7 +339,7 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 
 	if (!match) {
 		/* Have to call checks to ensure ids are loaded. Otherwise,
-		 * is_displayed will not work in any methods.
+		 * is_displayed will not work here or in any other methods.
 		 */
 #define ARG rtg_info, ginfo->pevent, record, &pid
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
@@ -325,57 +390,12 @@ rt_cpu_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot
 	return 1;
 }
 
-
 struct record*
 rt_cpu_plot_find_record(struct graph_info *ginfo, struct graph_plot *plot,
 		   unsigned long long time)
 {
 	struct rt_cpu_info *rtc_info = plot->private;
 	return find_record(ginfo, rtc_info->cpu, time);
-}
-
-static int get_time_info(struct graph_info *ginfo,
-			 struct rt_cpu_info *rtc_info,
-			 unsigned long long time,
-			 int *out_pid, int *out_job,
-			 struct record **out_record)
-{
-	struct record *record;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
-	unsigned long long dull, max_ts;
-	int cpu, is_running, pid, job;
-
-	cpu = rtc_info->cpu;
-	*out_pid = *out_job = is_running = 0;
-
-	record = find_record(ginfo, cpu, time);
-	*out_record = record;
-	if (!record)
-		goto out;
-
-	max_ts = time + SEARCH_PERIODS * rtg_info->max_period;
-	do {
-		if (get_rts(ginfo, record) > max_ts)
-			break;
-
-#define ARG rtg_info, ginfo->pevent, record, &pid, &job, &dull
-		if (rt_graph_check_switch_to(ARG)) {
-			/* Nothing is running */
-			goto out;
-		} else if (rt_graph_check_switch_away(ARG)) {
-			is_running = 1;
-			*out_pid = pid;
-			*out_job = job;
-			goto out;
-		}
-		if (*out_record != record)
-			free_record(record);
-#undef ARG
-	} while ((record = tracecmd_read_data(ginfo->handle, cpu)));
- out:
-	if (*out_record != record)
-		free_record(record);
-	return is_running;
 }
 
 static int
@@ -495,6 +515,9 @@ void rt_plot_cpus_update_callback(gboolean accept,
 	trace_graph_refresh(ginfo);
 }
 
+/**
+ * rt_plot_cpus_plotted - return the cpus plotted.
+ */
 void rt_plot_cpus_plotted(struct graph_info *ginfo,
 			 gboolean *all_cpus, guint64 **cpu_mask)
 {
@@ -517,7 +540,9 @@ void rt_plot_cpus_plotted(struct graph_info *ginfo,
 		TRUE : FALSE;
 }
 
-
+/**
+ * rt_plot_cpu - create a plot for @cpu.
+ */
 void rt_plot_cpu(struct graph_info *ginfo, int cpu)
 {
 	struct rt_cpu_info *rtc_info;

@@ -197,11 +197,15 @@ get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 }
 
 /*
- * Return information for @time, returns @job, @release, @deadline, and @record.
- * @job: Job number at this time
- * @release: Job's release time
- * @deadline: Job's deadline
- * @record: Matching record
+ * Get information about the given @time.
+ * @out_job: Job number at this time
+ * @out_release: Job's release time
+ * @out_deadline: Job's deadline
+ * @out_record: Matching record
+ *
+ * Return 1 and @out_record if a record is found at @time.
+ * Return @out_job, @out_release, and @out_deadline if the current
+ * job could be calculated.
  */
 static int get_time_info(struct graph_info *ginfo,
 			 struct rt_task_info *rtt_info,
@@ -766,7 +770,10 @@ void rt_plot_task_update_callback(gboolean accept,
 	trace_graph_refresh(ginfo);
 }
 
-void rt_plot_task_plotted(struct graph_info *ginfo, gint **plotted)
+/**
+ * rt_plot_tasks_plotted - return the tasks plotted.
+ */
+void rt_plot_tasks_plotted(struct graph_info *ginfo, gint **plotted)
 {
 	struct task_plot_info *task_info;
 	struct graph_plot *plot;
@@ -783,6 +790,9 @@ void rt_plot_task_plotted(struct graph_info *ginfo, gint **plotted)
 	}
 }
 
+/**
+ * rt_plot_task - create a plot for @pid.
+ */
 void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;

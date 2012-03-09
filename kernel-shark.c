@@ -1300,7 +1300,7 @@ plot_rt_tasks_clicked (gpointer data)
 
 	rtg_info = &ginfo->rtg_info;
 	tasks = task_list_pids(rtg_info->tasks);
-	rt_plot_task_plotted(ginfo, &selected);
+	rt_plot_tasks_plotted(ginfo, &selected);
 
 	trace_task_dialog(ginfo->handle, tasks, selected,
 			  rt_plot_task_update_callback, ginfo);

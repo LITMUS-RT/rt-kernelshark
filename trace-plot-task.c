@@ -23,9 +23,6 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define RED 0xff
-#define GREEN (0xff<<16)
-
 gboolean is_running(struct graph_info *ginfo, struct record *record)
 {
 	unsigned long long val;
