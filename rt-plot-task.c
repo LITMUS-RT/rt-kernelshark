@@ -83,18 +83,18 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 
 /*
  * Return first relevant record after @time.
- * @display: If set, only considers records which are plotted in some way
+ * @display: If set, only considers records which aren't plotted
  */
 static struct record*
 __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 {
-	int next_cpu, match, eid, ignored= 0;
-	struct record *record = NULL;
+	int next_cpu, match, eid, ignored;
+	struct record *record;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
 	set_cpus_to_rts(ginfo, time);
 	while ((record = tracecmd_read_next_data(ginfo->handle, &next_cpu))) {
-		free_record(record);
+		ignored = 0;
 		match = record_matches_pid(ginfo, record, pid);
 		if (display) {
 			eid = pevent_data_type(ginfo->pevent, record);
@@ -105,9 +105,10 @@ __find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
 				   eid == rtg_info->task_resume_id ||
 				   eid == rtg_info->task_release_id);
 		}
-		ignored = ignored && eid == ginfo->event_sched_switch_id;
+		ignored = ignored || eid == ginfo->event_sched_switch_id;
 		if (get_rts(ginfo, record) >= time && match && !ignored)
 			break;
+		free_record(record);
 	};
 
 	return record;
@@ -318,9 +319,11 @@ static int try_completion(struct graph_info *ginfo,
 	match = rt_graph_check_task_completion(&ginfo->rtg_info, ginfo->pevent,
 					       record, &pid, &job, &ts);
 	if (match && pid == rtt_info->pid) {
-		update_job(rtt_info, job);
+
 		info->completion = TRUE;
 		info->ctime = ts;
+		update_job(rtt_info, job);
+
 		dprintf(3, "Completion for %d:%d on %d at %llu\n",
 			pid, job, record->cpu, ts);
 		ret = 1;
@@ -386,7 +389,8 @@ try_switch_away(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, job);
 
-		if (rtt_info->run_time && rtt_info->run_time < ts) {
+		if (rtt_info->run_time && rtt_info->run_time < ts &&
+		    job != 1) {
 			dprintf(3, "Box for %d:%d, %llu to %llu on CPU %d\n",
 				rtt_info->pid, rtt_info->last_job,
 				rtt_info->run_time, ts, record->cpu);
@@ -430,7 +434,7 @@ static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info
 static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		   struct record *record, struct plot_info *info)
 {
-	int pid, eid, epid, my_pid, my_cpu, not_sa, ret = 0;
+	int pid, eid, epid, my_pid, my_cpu, not_sa, not_ss, ret = 0;
 	unsigned long long ts;
 
 	pid = rtt_info->pid;
@@ -440,8 +444,9 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	my_pid = (pid == epid);
 	my_cpu = (rtt_info->run_time && record->cpu == rtt_info->run_cpu);
 	not_sa = (eid != ginfo->rtg_info.switch_away_id);
-	if (not_sa && (my_pid || my_cpu) &&
-	    eid != ginfo->event_sched_switch_id) {
+	not_ss = (eid != ginfo->event_sched_switch_id);
+
+	if ((my_pid || my_cpu) && not_ss && not_sa) {
 		info->line = TRUE;
 		info->lcolor = hash_pid(record->cpu);
 		info->ltime = ts;

@@ -44,18 +44,51 @@ next_sa_record(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	return ret;
 }
 
-static struct record*
-find_record(struct graph_info *ginfo, int cpu, unsigned long long time)
+static inline int
+is_displayed(struct graph_info *ginfo, int eid)
 {
-	struct record *record = NULL;
+	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+	return !(eid == rtg_info->switch_away_id     ||
+		 eid == rtg_info->switch_to_id       ||
+		 eid == rtg_info->task_completion_id ||
+		 eid == rtg_info->task_block_id      ||
+		 eid == rtg_info->task_resume_id     ||
+		 eid == rtg_info->task_release_id    ||
+		 eid == ginfo->event_sched_switch_id);
+}
+
+static struct record*
+__find_record(struct graph_info *ginfo, int cpu, unsigned long long time,
+	      int display)
+{
+	struct record *record;
+	int eid, ignored;
+
 	set_cpu_to_rts(ginfo, time, cpu);
 
 	while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
-		if (get_rts(ginfo, record) >= time)
+		ignored = 0;
+		if (display) {
+			eid = pevent_data_type(ginfo->pevent, record);
+			ignored = !is_displayed(ginfo, eid);
+		}
+		if (get_rts(ginfo, record) >= time && !ignored)
 			break;
 		free_record(record);
 	}
 	return record;
+}
+
+static inline struct record*
+find_record(struct graph_info *ginfo, int cpu, guint64 time)
+{
+	return __find_record(ginfo, cpu, time, 0);
+}
+
+static inline struct record*
+find_display_record(struct graph_info *ginfo, int cpu, guint64 time)
+{
+	return __find_record(ginfo, cpu, time, 1);
 }
 
 
@@ -79,7 +112,8 @@ try_switch_away(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 					   record, &pid, &job, &ts);
 	if (match) {
 		update_pid(rtc_info, pid);
-		if (rtc_info->rt_run_time && rtc_info->rt_run_time < ts) {
+		if (rtc_info->rt_run_time && rtc_info->rt_run_time < ts &&
+		    job != 1) {
 			info->box = TRUE;
 			info->bcolor = hash_pid(rtc_info->run_pid);
 			info->bfill = TRUE;
@@ -220,8 +254,8 @@ static void rt_cpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			     struct record *record, struct plot_info *info)
 {
-	int pid, eid, match;
-	unsigned long long ts;
+	int pid, eid, match, dint;
+	unsigned long long ts, dull;
 	struct rt_cpu_info *rtc_info = plot->private;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
@@ -239,11 +273,20 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		try_sched_switch(ginfo, rtc_info, record, info);
 
 	if (!match) {
-		rt_graph_check_any(rtg_info, ginfo->pevent, record,
-				   &pid, &eid, &ts);
-		info->line = TRUE;
-		info->lcolor = hash_pid(pid);
-		info->ltime = ts;
+		/* Have to call checks to ensure ids are loaded. Otherwise,
+		 * is_displayed will not work in any methods.
+		 */
+#define ARG rtg_info, ginfo->pevent, record, &pid
+		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
+		rt_graph_check_task_block(ARG, &dull);
+		rt_graph_check_task_resume(ARG, &dull);
+		rt_graph_check_any(ARG, &eid, &ts);
+#undef ARG
+		if (is_displayed(ginfo, eid)) {
+			info->line = TRUE;
+			info->lcolor = hash_pid(pid);
+			info->ltime = ts;
+		}
 	}
 	return 1;
 }
@@ -263,7 +306,7 @@ rt_cpu_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot
 	if (record)
 		offset = record->offset;
 
-	record = find_record(ginfo, cpu, time);
+	record = find_display_record(ginfo, cpu, time);
 
 	if (offset)
 		tracecmd_set_cursor(ginfo->handle, cpu, offset);
@@ -351,7 +394,7 @@ rt_cpu_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 
 	if (is_running) {
 		comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
-		trace_seq_printf(s, "%s-%d:%d\n", comm, pid, job);
+		trace_seq_printf(s, "%s-%d:%d\n\n", comm, pid, job);
 	}
 
 	if (record) {
@@ -360,16 +403,15 @@ rt_cpu_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 			eid = pevent_data_type(ginfo->pevent, record);
 			event = pevent_data_event_from_type(ginfo->pevent, eid);
 			if (event) {
-				trace_seq_putc(s, '\n');
 				trace_seq_puts(s, event->name);
 				trace_seq_putc(s, '\n');
 				pevent_event_info(s, event, record);
+				trace_seq_putc(s, '\n');
 			} else
-				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
+				trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
 		}
 		free_record(record);
 	}
-	trace_seq_putc(s, '\n');
 	nano_to_milli(time, &msec, &nsec);
 	trace_seq_printf(s, "%llu.%06llu ms CPU: %03d",
 			 msec, nsec, rtc_info->cpu);

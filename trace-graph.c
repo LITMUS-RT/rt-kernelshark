@@ -1632,14 +1632,20 @@ static gint draw_event_label(struct graph_info *ginfo, gint i,
 }
 
 static gint draw_plot_line(struct graph_info *ginfo, int i,
-			   unsigned long long time, GdkGC *gc)
+			   unsigned long long time, gboolean small,
+			   GdkGC *gc)
 {
 	gint x;
+	gint y;
 
 	x = convert_time_to_x(ginfo, time);
+	/* y = (small) ? PLOT_BOX_TOP(i) : PLOT_TOP(i); */
+	y = PLOT_TOP(i);
 
-	gdk_draw_line(ginfo->curr_pixmap, gc,
-		      x, PLOT_TOP(i), x, PLOT_BOTTOM(i));
+	if (!small || convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME) {
+		gdk_draw_line(ginfo->curr_pixmap, gc,
+			      x, y, x, PLOT_BOTTOM(i));
+	}
 
 	return x;
 }
@@ -1815,7 +1821,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 			set_color(ginfo->draw, plot->gc, plot->last_color);
 		}
 
-		x = draw_plot_line(ginfo, plot->pos, info.ltime, plot->gc);
+		x = draw_plot_line(ginfo, plot->pos, info.ltime, info.lsmall, plot->gc);
 
 		/* Figure out if we can show the text for the previous record */
 

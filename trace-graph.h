@@ -58,6 +58,7 @@ struct graph_plot;
 
 struct plot_info {
 	gboolean		line;
+	gboolean		lsmall;
 	int			lcolor;
 	unsigned long long	ltime;
 
