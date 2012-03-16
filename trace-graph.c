@@ -55,7 +55,7 @@
 #define PLOT_GIVE	2
 #define PLOT_BEGIN	80
 #define PLOT_SEP	50
-#define MAX_TRI_TIME    20000000
+#define MAX_TRI_TIME    10000000
 #define PLOT_LINE(plot) (PLOT_SEP * (plot) + PLOT_BEGIN + PLOT_SIZE)
 #define PLOT_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE * 2)
 #define PLOT_BOX_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE)
@@ -1646,7 +1646,7 @@ static gint draw_plot_line(struct graph_info *ginfo, int i,
 	x = convert_time_to_x(ginfo, time);
 	y = PLOT_TOP(i);
 
-	if (!small || is_high_res(ginfo)) {
+	if (is_high_res(ginfo)) {
 		gdk_draw_line(ginfo->curr_pixmap, gc,
 			      x, y, x, PLOT_BOTTOM(i));
 	}

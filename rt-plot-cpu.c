@@ -1,3 +1,4 @@
+#include <string.h>
 #include "trace-graph.h"
 #include "cpu.h"
 
@@ -35,7 +36,7 @@ next_sa_record(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 			free_record(record);
 			break;
 		}
-		match = rt_graph_check_switch_away(rtg_info, pevent, record,
+		match = rt_graph_check_switch_away(ginfo, record,
 						   &pid, &dint, &dull);
 		if (match) {
 			ret = record;
@@ -149,7 +150,7 @@ static int get_time_info(struct graph_info *ginfo,
 		if (get_rts(ginfo, record) > max_ts)
 			break;
 
-#define ARG rtg_info, ginfo->pevent, record, &pid, &job, &dull
+#define ARG ginfo, record, &pid, &job, &dull
 		if (rt_graph_check_switch_to(ARG) && pid) {
 			goto out;
 		} else if (rt_graph_check_switch_away(ARG) && pid) {
@@ -184,8 +185,7 @@ try_switch_away(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	int job, pid, match;
 	unsigned long long ts;
 
-	match = rt_graph_check_switch_away(&ginfo->rtg_info, ginfo->pevent,
-					   record, &pid, &job, &ts);
+	match = rt_graph_check_switch_away(ginfo, record,  &pid, &job, &ts);
 	match = match && pid;
 	if (match) {
 		update_pid(rtc_info, pid);
@@ -212,10 +212,8 @@ try_switch_to(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	int job, pid, match;
 	unsigned long long ts;
 
-	match = rt_graph_check_switch_to(&ginfo->rtg_info, ginfo->pevent,
-					 record, &pid, &job, &ts);
+	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts);
 	match = match && pid;
-
 	if (match) {
 		update_pid(rtc_info, pid);
 		rtc_info->rt_run_time = ts;
@@ -231,8 +229,7 @@ try_completion(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	int pid, job, match;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_completion(&ginfo->rtg_info, ginfo->pevent,
-					       record, &pid, &job, &ts);
+	match = rt_graph_check_task_completion(ginfo, record, &pid, &job, &ts);
 	if (match) {
 		info->completion = TRUE;
 		info->ctime = ts;
@@ -336,7 +333,6 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 	int pid, eid, match, dint;
 	unsigned long long ts, dull;
 	struct rt_cpu_info *rtc_info = plot->private;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
 	if (!record) {
 		do_plot_end(ginfo, rtc_info, info);
@@ -355,7 +351,7 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		/* Have to call checks to ensure ids are loaded. Otherwise,
 		 * is_displayed will not work here or in any other methods.
 		 */
-#define ARG rtg_info, ginfo->pevent, record, &pid
+#define ARG ginfo,record, &pid
 		rt_graph_check_task_param(ARG, &dull, &dull);
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
 		rt_graph_check_task_block(ARG, &dull);
@@ -559,24 +555,31 @@ void rt_plot_cpus_plotted(struct graph_info *ginfo,
 }
 
 /**
- * rt_plot_cpu - create a plot for @cpu.
+ * rt_plot_cpu_label - create a plot for @cpu with @label.
  */
-void rt_plot_cpu(struct graph_info *ginfo, int cpu)
+void rt_plot_cpu_label(struct graph_info *ginfo, int cpu, char* label)
 {
 	struct rt_cpu_info *rtc_info;
 	struct graph_plot *plot;
-	char label[100];
 
 	rtc_info = malloc_or_die(sizeof(*rtc_info));
 	memset(rtc_info, 0, sizeof(*rtc_info));
 	rtc_info->cpu = cpu;
-	rtc_info->label = malloc_or_die(LLABEL);
-
-	snprintf(label, 100, "RT-CPU %d", cpu);
+	rtc_info->label = label;
 
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_RT_CPU,
 				       TIME_TYPE_RT, &rt_cpu_cb, rtc_info);
 	trace_graph_plot_add_all_recs(ginfo, plot);
+}
+
+/**
+ * rt_plot_cpu - create a plot for @cpu.
+ */
+void rt_plot_cpu(struct graph_info *ginfo, int cpu)
+{
+	char *label = malloc_or_die(LLABEL);
+	snprintf(label, 100, "RT-CPU %d", cpu);
+	rt_plot_cpu_label(ginfo, cpu, label);
 }
 
 void rt_plot_init_cpus(struct graph_info *ginfo, int cpus)

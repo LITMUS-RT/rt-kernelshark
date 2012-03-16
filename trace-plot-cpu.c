@@ -77,6 +77,7 @@ static int filter_record(struct graph_info *ginfo,
 	gboolean is_sched_switch = FALSE;
 	gboolean is_wakeup = FALSE;
 	const char *comm;
+	char *name;
 	int wake_pid;
 	int filter;
 	gint rpid;
@@ -89,8 +90,10 @@ static int filter_record(struct graph_info *ginfo,
 
 
 	/* Load real-time records */
-	rt_graph_check_task_param(&ginfo->rtg_info, ginfo->pevent, record,
+	rt_graph_check_task_param(ginfo, record,
 				  &rpid, &wcet, &period);
+	rt_graph_check_container_param(ginfo, record, &rpid, &name);
+	rt_graph_check_server_param(ginfo, record, &rpid, &rpid, &period, &wcet);
 
 	if (trace_graph_check_sched_switch(ginfo, record, sched_pid, &comm)) {
 		is_sched_switch = TRUE;

@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <string.h>
 #include "trace-graph.h"
 #include "trace-filter.h"
 
@@ -21,12 +23,11 @@ static gboolean record_matches_pid(struct graph_info *ginfo,
 {
 	gint dint, pid = 0, match;
 	unsigned long long dull;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
 	/* Must use check_* in case record has not been found yet,
 	 * this macro was the best of many terrible options.
 	 */
-#define ARG rtg_info, ginfo->pevent, record, &pid
+#define ARG ginfo, record, &pid
 	match = rt_graph_check_switch_to(ARG, &dint, &dull)           ||
 		rt_graph_check_switch_away(ARG, &dint,  &dull)        ||
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
@@ -63,10 +64,10 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		}
 
 		/* Sorry mother */
-#define ARG rtg_info, pevent, record, &pid
+#define ARG ginfo, record, &pid
 		match = rt_graph_check_switch_to(ARG, &dint, &dull)   ||
 			rt_graph_check_switch_away(ARG, &dint, &dull) ||
-			rt_graph_check_task_block(ARG, &dull)        ||
+			rt_graph_check_task_block(ARG, &dull)         ||
 			rt_graph_check_task_resume(ARG, &dull);
 #undef ARG
 		eid = (match) ? pevent_data_type(pevent, record) : 0;
@@ -164,7 +165,6 @@ get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	int pid, job, match;
 	unsigned long long release, deadline;
 	struct record *last_record, *record, *ret = NULL;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 
 	last_record = tracecmd_peek_data(ginfo->handle, cpu);
 	*out_job = *out_release = *out_deadline = 0;
@@ -177,8 +177,7 @@ get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 			free_record(record);
 			goto out;
 		}
-		match = rt_graph_check_task_release(rtg_info, ginfo->pevent,
-						    record, &pid, &job,
+		match = rt_graph_check_task_release(ginfo, record, &pid, &job,
 						    &release, &deadline);
 		free_record(last_record);
 		last_record = record;
@@ -267,8 +266,7 @@ static int try_param(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	if (rtt_info->params_found)
 		goto out;
 
-	match = rt_graph_check_task_param(&ginfo->rtg_info, ginfo->pevent,
-					  record, &pid, &wcet, &period);
+	match = rt_graph_check_task_param(ginfo, record, &pid, &wcet, &period);
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, 0);
 		rtt_info->wcet = wcet;
@@ -290,8 +288,7 @@ static int try_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	int pid, job, match, ret = 0;
 	unsigned long long release, deadline;
 
-	match = rt_graph_check_task_release(&ginfo->rtg_info, ginfo->pevent,
-					    record, &pid, &job,
+	match = rt_graph_check_task_release(ginfo, record, &pid, &job,
 					    &release, &deadline);
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, job);
@@ -320,8 +317,7 @@ static int try_completion(struct graph_info *ginfo,
 	int pid, job, match, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_completion(&ginfo->rtg_info, ginfo->pevent,
-					       record, &pid, &job, &ts);
+	match = rt_graph_check_task_completion(ginfo, record, &pid, &job, &ts);
 	if (match && pid == rtt_info->pid) {
 
 		info->completion = TRUE;
@@ -341,8 +337,7 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	int pid, match, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_block(&ginfo->rtg_info, ginfo->pevent,
-					  record, &pid, &ts);
+	match = rt_graph_check_task_block(ginfo, record, &pid, &ts);
 	if (match && pid == rtt_info->pid) {
 		rtt_info->fresh = FALSE;
 		rtt_info->block_time = ts;
@@ -360,8 +355,7 @@ static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	int pid, match, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_resume(&ginfo->rtg_info, ginfo->pevent,
-					   record, &pid, &ts);
+	match = rt_graph_check_task_resume(ginfo, record, &pid, &ts);
 	if (match && pid == rtt_info->pid) {
 		info->box = TRUE;
 		info->bcolor = 0x0;
@@ -388,8 +382,7 @@ try_switch_away(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	int job, pid, match, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_switch_away(&ginfo->rtg_info, ginfo->pevent,
-					   record, &pid, &job, &ts);
+	match = rt_graph_check_switch_away(ginfo, record, &pid, &job, &ts);
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, job);
 
@@ -422,8 +415,7 @@ static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info
 	int job, pid, match, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_switch_to(&ginfo->rtg_info, ginfo->pevent,
-					 record, &pid, &job, &ts);
+	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts);
 	if (match && pid == rtt_info->pid) {
 		update_job(rtt_info, job);
 		rtt_info->run_time = ts;
@@ -442,8 +434,7 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	unsigned long long ts;
 
 	pid = rtt_info->pid;
-	rt_graph_check_any(&ginfo->rtg_info, ginfo->pevent, record,
-			   &epid, &eid, &ts);
+	rt_graph_check_any(ginfo, record, &epid, &eid, &ts);
 
 	my_pid = (pid == epid);
 	my_cpu = (rtt_info->run_time && record->cpu == rtt_info->run_cpu);
@@ -801,7 +792,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	struct graph_plot *plot;
 	struct task_list *list;
 	const char *comm;
-	unsigned long long wm, wn, pm, pn;
+	float ms_wcet, ms_period;
 	char *plot_label;
 	int len;
 
@@ -816,16 +807,16 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	rtt_info->pid = pid;
 	rtt_info->label = malloc_or_die(LLABEL);
 
-	nano_to_milli(params->wcet, &wm, &wn);
-	nano_to_milli(params->period, &pm, &pn);
+	ms_wcet = nano_as_milli(params->wcet);
+	ms_period = nano_as_milli(params->period);
 
 	/* Create plot */
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 	len = strlen(comm) + 100;
 	plot_label = malloc_or_die(len);
 	snprintf(plot_label, len,
-		 "%s-%d\n(%llu.%1llu, %llu.%1llu)",
-		 comm, pid, wm, wn, pm, pn);
+		 "%s-%d\n(%1.1f, %1.1f)",
+		 comm, pid, ms_wcet, ms_period);
 	plot = trace_graph_plot_insert(ginfo, pos, plot_label, PLOT_TYPE_RT_TASK,
 				       TIME_TYPE_RT,
 				       &rt_task_cb, rtt_info);
