@@ -4,6 +4,8 @@
 #include "trace-plot-task.h"
 
 struct rt_task_info {
+	struct rt_plot_common	common;
+
 	int			pid;
 	unsigned long long	wcet;
 	unsigned long long	period;
@@ -24,6 +26,8 @@ struct rt_task_info {
 	gboolean		fresh;
 	char			*label;
 };
+
+const struct plot_callbacks rt_task_cb;
 
 void rt_plot_task(struct graph_info *ginfo, int pid, int pos);
 void rt_plot_tasks_plotted(struct graph_info *ginfo, gint **plotted);

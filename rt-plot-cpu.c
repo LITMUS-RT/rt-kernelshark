@@ -55,13 +55,13 @@ static inline int
 is_displayed(struct graph_info *ginfo, int eid)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
-	return !(eid == rtg_info->switch_away_id     ||
-		 eid == rtg_info->switch_to_id       ||
-		 eid == rtg_info->task_completion_id ||
-		 eid == rtg_info->task_block_id      ||
-		 eid == rtg_info->task_resume_id     ||
-		 eid == rtg_info->task_release_id    ||
-		 eid == ginfo->event_sched_switch_id);
+	return (eid == rtg_info->switch_away_id     ||
+		eid == rtg_info->switch_to_id       ||
+		eid == rtg_info->task_completion_id ||
+		eid == rtg_info->task_block_id      ||
+		eid == rtg_info->task_resume_id     ||
+		eid == rtg_info->task_release_id    ||
+		eid == ginfo->event_sched_switch_id);
 }
 
 static struct record*
@@ -78,7 +78,7 @@ __find_record(struct graph_info *ginfo, int cpu, unsigned long long time,
 		eid = pevent_data_type(ginfo->pevent, record);
 
 		if (display)
-			ignored = !is_displayed(ginfo, eid);
+			ignored = is_displayed(ginfo, eid);
 
 		if (get_rts(ginfo, record) >= time && !ignored)
 			break;
@@ -140,6 +140,7 @@ static int get_time_info(struct graph_info *ginfo,
 	cpu = rtc_info->cpu;
 	*out_pid = *out_job = is_running = 0;
 
+	/* TODO: inneficient */
 	*out_record = find_display_record(ginfo, cpu, time);
 	record = find_record(ginfo, cpu, time);
 	if (!record)
@@ -330,8 +331,9 @@ static void rt_cpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			     struct record *record, struct plot_info *info)
 {
-	int pid, eid, match, dint;
+	int pid = 0, eid, match, dint;
 	unsigned long long ts, dull;
+	char *dchar;
 	struct rt_cpu_info *rtc_info = plot->private;
 
 	if (!record) {
@@ -348,18 +350,21 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		try_sched_switch(ginfo, rtc_info, record, info);
 
 	if (!match) {
-		/* Have to call checks to ensure ids are loaded. Otherwise,
+		/* TODO: this should not be necessary!
+		 * Have to call checks to ensure ids are loaded. Otherwise,
 		 * is_displayed will not work here or in any other methods.
 		 */
 #define ARG ginfo,record, &pid
 		rt_graph_check_task_param(ARG, &dull, &dull);
+		rt_graph_check_container_param(ARG, &dchar);
+		rt_graph_check_server_param(ARG, &dint, &dull, &dull);
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
 		rt_graph_check_task_block(ARG, &dull);
 		rt_graph_check_task_resume(ARG, &dull);
 		rt_graph_check_any(ARG, &eid, &ts);
 #undef ARG
 
-		if (is_displayed(ginfo, eid)) {
+		if (!is_displayed(ginfo, eid)) {
 			info->line = TRUE;
 			info->lcolor = hash_pid(pid);
 			info->ltime = ts;
@@ -462,8 +467,7 @@ static void rt_cpu_plot_destroy(struct graph_info *ginfo, struct graph_plot *plo
 	free(rtc_info);
 }
 
-
-static const struct plot_callbacks rt_cpu_cb = {
+const struct plot_callbacks rt_cpu_cb = {
 	.start			= rt_cpu_plot_start,
 	.destroy		= rt_cpu_plot_destroy,
 	.plot_event		= rt_cpu_plot_event,

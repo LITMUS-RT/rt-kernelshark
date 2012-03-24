@@ -1308,6 +1308,18 @@ plot_rt_tasks_clicked (gpointer data)
 	free(selected);
 }
 
+/* Callback for the clicked signal of the plot real-time tasks button */
+static void
+plot_containers_clicked (gpointer data)
+{
+	struct shark_info *info = data;
+	struct graph_info *ginfo = info->ginfo;
+	if (!ginfo->handle)
+		return;
+
+	trace_container_dialog(ginfo, NULL);
+}
+
 static void
 show_all_rt_clicked (gpointer data)
 {
@@ -2256,6 +2268,22 @@ void kernel_shark(int argc, char **argv)
 
 	/* We do need to show menu items */
 	gtk_widget_show(sub_item);
+
+	/* --- Plot - RT CPUs Option --- */
+
+	sub_item = gtk_menu_item_new_with_label("Containers");
+
+	/* Add them to the menu */
+	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+
+	/* We can attach the Quit menu item to our exit function */
+	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
+				  G_CALLBACK (plot_containers_clicked),
+				  (gpointer) info);
+
+	/* We do need to show menu items */
+	gtk_widget_show(sub_item);
+
 
 	/* --- Plot - RT CPUs Option --- */
 

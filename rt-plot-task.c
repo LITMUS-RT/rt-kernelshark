@@ -3,7 +3,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 4
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -13,31 +13,6 @@
 #else
 #define dprintf(l, x...)	do { if (0) printf(x); } while (0)
 #endif
-
-/*
- * Return 1 if @record is relevant to @match_pid.
- */
-static gboolean record_matches_pid(struct graph_info *ginfo,
-				   struct record *record,
-				   int match_pid)
-{
-	gint dint, pid = 0, match;
-	unsigned long long dull;
-
-	/* Must use check_* in case record has not been found yet,
-	 * this macro was the best of many terrible options.
-	 */
-#define ARG ginfo, record, &pid
-	match = rt_graph_check_switch_to(ARG, &dint, &dull)           ||
-		rt_graph_check_switch_away(ARG, &dint,  &dull)        ||
-		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
-		rt_graph_check_task_completion(ARG, &dint, &dull)     ||
-		rt_graph_check_task_block(ARG, &dull)                 ||
-		rt_graph_check_task_resume(ARG, &dull)		||
-		rt_graph_check_any(ARG, &dint, &dull);
-#undef ARG
-	return pid == match_pid;
-}
 
 /*
  * Return the first record after @time (within a range) which draws a box.
@@ -83,51 +58,6 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 }
 
 /*
- * Return first relevant record after @time.
- * @display: If set, only considers records which aren't plotted
- */
-static struct record*
-__find_record(struct graph_info *ginfo, gint pid, guint64 time, int display)
-{
-	int next_cpu, match, eid, ignored;
-	struct record *record;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
-
-	set_cpus_to_rts(ginfo, time);
-	while ((record = tracecmd_read_next_data(ginfo->handle, &next_cpu))) {
-		ignored = 0;
-		match = record_matches_pid(ginfo, record, pid);
-		if (display) {
-			eid = pevent_data_type(ginfo->pevent, record);
-			ignored = (eid == rtg_info->switch_away_id ||
-				   eid == rtg_info->switch_to_id   ||
-				   eid == rtg_info->task_completion_id ||
-				   eid == rtg_info->task_block_id  ||
-				   eid == rtg_info->task_resume_id ||
-				   eid == rtg_info->task_release_id);
-		}
-		ignored = ignored || eid == ginfo->event_sched_switch_id;
-		if (get_rts(ginfo, record) >= time && match && !ignored)
-			break;
-		free_record(record);
-	};
-
-	return record;
-}
-
-static inline struct record*
-find_record(struct graph_info *ginfo, gint pid, guint64 time)
-{
-	return __find_record(ginfo, pid, time, 0);
-}
-
-static inline struct record*
-find_display_record(struct graph_info *ginfo, gint pid, guint64 time)
-{
-	return __find_record(ginfo, pid, time, 1);
-}
-
-/*
  * Update current job in @rtt_info, ensuring monotonic increase.
  */
 static int update_job(struct rt_task_info *rtt_info, int job)
@@ -143,56 +73,6 @@ static int update_job(struct rt_task_info *rtt_info, int job)
 			 rtt_info->pid, rtt_info->last_job);
 	}
 	return 1;
-}
-
-
-
-/*
- * Find the information for the last release of @rtt_info on @cpu before @time.
- * @min_ts: the minimum time stamp to parse
- *
- * Returns release record and @out_job, @out_release, and @out_deadline if a
- * release was found after @mints matching @time.
- */
-static struct record*
-get_previous_release(struct graph_info *ginfo, struct rt_task_info *rtt_info,
-		     int cpu,
-		     unsigned long long min_ts, unsigned long long time,
-		     int *out_job,
-		     unsigned long long *out_release,
-		     unsigned long long *out_deadline)
-{
-	int pid, job, match;
-	unsigned long long release, deadline;
-	struct record *last_record, *record, *ret = NULL;
-
-	last_record = tracecmd_peek_data(ginfo->handle, cpu);
-	*out_job = *out_release = *out_deadline = 0;
-	if (!last_record)
-		return NULL;
-	last_record->ref_count++;
-
-	while ((record = tracecmd_read_prev(ginfo->handle, last_record))) {
-		if (record->ts < min_ts) {
-			free_record(record);
-			goto out;
-		}
-		match = rt_graph_check_task_release(ginfo, record, &pid, &job,
-						    &release, &deadline);
-		free_record(last_record);
-		last_record = record;
-		if (match && (pid == rtt_info->pid) && release <= time) {
-			ret = record;
-			last_record = NULL;
-			*out_job = job;
-			*out_release = release;
-			*out_deadline = deadline;
-			break;
-		}
-	};
- out:
-	free_record(last_record);
-	return ret;
 }
 
 /*
@@ -215,15 +95,11 @@ static int get_time_info(struct graph_info *ginfo,
 			 struct record **out_record)
 
 {
-	int cpu, job;
-	unsigned long long release, deadline, min_ts;
-	struct record *record;
-	struct offset_cache *offsets;
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+	int job;
 
 	/* Seek CPUs to first record after this time */
-	*out_job = *out_release = *out_deadline = 0;
-	*out_record = find_record(ginfo, rtt_info->pid, time);
+	*out_record = find_rt_record(ginfo,
+				     (struct rt_plot_common*)rtt_info, time);
 	if (!*out_record)
 		return 0;
 
@@ -236,22 +112,8 @@ static int get_time_info(struct graph_info *ginfo,
 		goto out;
 	}
 
-	min_ts = time - SEARCH_PERIODS * rtg_info->max_period;
-	*out_job = *out_release = *out_deadline = 0;
-
-	offsets = save_offsets(ginfo);
-	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
-		record = get_previous_release(ginfo, rtt_info, cpu, min_ts,
-					      time, &job, &release, &deadline);
-		if (record && record->ts > min_ts) {
-			*out_job = job;
-			*out_release = release;
-			*out_deadline = deadline;
-			min_ts = record->ts;
-		}
-		free_record(record);
-	}
-	restore_offsets(ginfo, offsets);
+	get_previous_release(ginfo, rtt_info->pid, time,
+			     out_job, out_release, out_deadline);
  out:
 	return 1;
 }
@@ -537,9 +399,6 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 
 	dprintf(4,"%s\n", __FUNCTION__);
 
-	rtt_info->wcet = 0ULL;
-	rtt_info->period = 0ULL;
-
 	rtt_info->run_time = time;
 	rtt_info->block_time = time;
 	rtt_info->run_cpu = NO_CPU;
@@ -548,7 +407,8 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 	rtt_info->fresh = TRUE;
 	for (i = 0; i < 3; i++)
 		rtt_info->first_rels[i] = 0ULL;
-	rtt_info->last_job = 0;
+	rtt_info->last_job = -1;
+	update_job(rtt_info, 0);
 }
 
 static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
@@ -560,143 +420,91 @@ static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *pl
 	free(rtt_info);
 }
 
-static int rt_task_plot_display_last_event(struct graph_info *ginfo,
-				 struct graph_plot *plot,
-				 struct trace_seq *s,
-				 unsigned long long time)
+static int
+rt_task_plot_record_matches(struct rt_plot_common *rt,
+			    struct graph_info *ginfo,
+			    struct record *record)
+
 {
-	int eid;
-	struct event_format *event;
-	struct record *record;
-	struct offset_cache *offsets;
-	struct rt_task_info *rtt_info = plot->private;
+	struct rt_task_info *rtt_info = (struct rt_task_info*)rt;
+	gint dint, pid = 0, match, match_pid;
+	unsigned long long dull;
 
-	dprintf(4,"%s\n", __FUNCTION__);
+	match_pid = rtt_info->pid;
 
-	offsets = save_offsets(ginfo);
-	record = find_display_record(ginfo, rtt_info->pid, time);
-	restore_offsets(ginfo, offsets);
-	if (!record)
-		return 0;
-
-	eid = pevent_data_type(ginfo->pevent, record);
-	event = pevent_data_event_from_type(ginfo->pevent, eid);
-	if (event)
-		trace_seq_puts(s, event->name);
-	else
-		trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
-	trace_seq_putc(s, '\n');
-	trace_seq_printf(s, "CPU %d\n", record->cpu);
-	free_record(record);
-
-	return 1;
+	/* Must use check_* in case record has not been found yet,
+	 * this macro was the best of many terrible options.
+	 */
+#define ARG ginfo, record, &pid
+	match = rt_graph_check_switch_to(ARG, &dint, &dull)           ||
+		rt_graph_check_switch_away(ARG, &dint,  &dull)        ||
+		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
+		rt_graph_check_task_completion(ARG, &dint, &dull)     ||
+		rt_graph_check_task_block(ARG, &dull)                 ||
+		rt_graph_check_task_resume(ARG, &dull)		      ||
+		rt_graph_check_any(ARG, &dint, &dull);
+#undef ARG
+	return pid == match_pid;
 }
 
-static int rt_task_plot_display_info(struct graph_info *ginfo,
-				     struct graph_plot *plot,
-				     struct trace_seq *s,
-				     unsigned long long time)
+
+static int rt_task_plot_is_drawn(struct graph_info *ginfo, int eid)
+{
+	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+
+	return (eid == rtg_info->switch_away_id     ||
+		eid == rtg_info->switch_to_id       ||
+		eid == rtg_info->task_completion_id ||
+		eid == rtg_info->task_block_id      ||
+		eid == rtg_info->task_resume_id     ||
+		eid == rtg_info->task_release_id);
+}
+
+static struct record*
+rt_task_plot_write_header(struct rt_plot_common *rt,
+			  struct graph_info *ginfo,
+			  struct trace_seq *s,
+			  unsigned long long time)
 {
 	const char *comm;
-	int pid, job, eid;
+	int pid, job, found;
 	struct record *record;
-	struct event_format *event;
-	unsigned long long msec, nsec;
-	unsigned long long release, deadline, rts;
-	struct rt_task_info *rtt_info = plot->private;
-	struct offset_cache *offsets;
+	unsigned long long release, deadline;
+	struct rt_task_info *rtt_info = (struct rt_task_info*)rt;
 
 	dprintf(4,"%s\n", __FUNCTION__);
 
-	offsets = save_offsets(ginfo);
-	get_time_info(ginfo, rtt_info, time,
-		      &job, &release, &deadline, &record);
-	restore_offsets(ginfo, offsets);
+	found = get_time_info(ginfo, rtt_info, time,
+			      &job, &release, &deadline, &record);
+	if (!found)
+		goto out;
 
 	pid = rtt_info->pid;
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
 	trace_seq_printf(s, "%s-%d:%d\n", comm, pid, job);
 
-	if (record) {
-		rts = get_rts(ginfo, record);
-		eid = pevent_data_type(ginfo->pevent, record);
-
-		if (in_res(ginfo, deadline, time)) {
-			trace_seq_printf(s, "\nlitmus_deadline\n"
-					 "deadline(job(%d,%d)): %llu\n",
-					 pid, job, deadline);
-		}
-		if (in_res(ginfo, release, time)) {
-			trace_seq_printf(s, "\nlitmus_release\n"
-					 "release(job(%d,%d)): %llu\n",
-					 pid, job, release);
-		}
-
-		if (in_res(ginfo, rts, time)) {
-			event = pevent_data_event_from_type(ginfo->pevent, eid);
-			if (event) {
-				trace_seq_putc(s, '\n');
-				trace_seq_puts(s, event->name);
-				trace_seq_putc(s, '\n');
-				pevent_event_info(s, event, record);
-			} else
-				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
-		}
-		trace_seq_putc(s, '\n');
-		nano_to_milli(time, &msec, &nsec);
-		trace_seq_printf(s, "%llu.%06llu ms CPU: %03d",
-				 msec, nsec, record->cpu);
-		free_record(record);
+	if (in_res(ginfo, deadline, time)) {
+		trace_seq_printf(s, "\nlitmus_deadline\n"
+				 "deadline(job(%d,%d)): %llu\n",
+				 pid, job, deadline);
 	}
-
-	return 1;
+	if (in_res(ginfo, release, time)) {
+		trace_seq_printf(s, "\nlitmus_release\n"
+				 "release(job(%d,%d)): %llu\n",
+				 pid, job, release);
+	}
+ out:
+	return record;
 }
 
-static int rt_task_plot_match_time(struct graph_info *ginfo,
-				   struct graph_plot *plot,
-				   unsigned long long time)
-{
-	struct record *record = NULL;
-	struct rt_task_info *rtt_info = plot->private;
-	int next_cpu, match, ret;
-
-	dprintf(4,"%s\n", __FUNCTION__);
-
-	set_cpus_to_rts(ginfo, time);
-
-	do {
-		free_record(record);
-		record = tracecmd_read_next_data(ginfo->handle, &next_cpu);
-		if (!record)
-			return 0;
-		match = record_matches_pid(ginfo, record, rtt_info->pid);
-	} while ((!match && get_rts(ginfo, record) < time + 1) ||
-		 (match && get_rts(ginfo, record) < time));
-
-	if (record && get_rts(ginfo, record) == time)
-		ret = 1;
-	free_record(record);
-
-	return ret;
-}
-
-static struct record *
-rt_task_plot_find_record(struct graph_info *ginfo, struct graph_plot *plot,
-		      unsigned long long time)
-{
-	struct rt_task_info *rtt_info = plot->private;
-	return find_record(ginfo, rtt_info->pid, time);
-}
-
-
-static const struct plot_callbacks rt_task_cb = {
+const struct plot_callbacks rt_task_cb = {
 	.start			= rt_task_plot_start,
 	.destroy		= rt_task_plot_destroy,
 	.plot_event		= rt_task_plot_event,
-	.display_last_event	= rt_task_plot_display_last_event,
-	.display_info		= rt_task_plot_display_info,
-	.match_time		= rt_task_plot_match_time,
-	.find_record		= rt_task_plot_find_record,
+	.display_last_event	= rt_plot_display_last_event,
+	.display_info		= rt_plot_display_info,
+	.match_time		= rt_plot_match_time,
+	.find_record		= rt_plot_find_record,
 };
 
 void rt_plot_task_update_callback(gboolean accept,
@@ -806,6 +614,12 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	rtt_info = malloc_or_die(sizeof(*rtt_info));
 	rtt_info->pid = pid;
 	rtt_info->label = malloc_or_die(LLABEL);
+	rtt_info->wcet = params->wcet;
+	rtt_info->period = params->period;
+
+	rtt_info->common.record_matches = rt_task_plot_record_matches;
+	rtt_info->common.is_drawn = rt_task_plot_is_drawn;
+	rtt_info->common.write_header = rt_task_plot_write_header;
 
 	ms_wcet = nano_as_milli(params->wcet);
 	ms_period = nano_as_milli(params->period);
@@ -825,7 +639,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 }
 
 void rt_plot_add_all_tasks(struct graph_info *ginfo)
-{
+ {
 	gint *tasks;
 	int i;
 	tasks = task_list_pids(ginfo->rtg_info.tasks);

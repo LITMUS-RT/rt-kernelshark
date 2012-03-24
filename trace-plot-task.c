@@ -700,7 +700,7 @@ void task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
 	free(task_info);
 }
 
-static const struct plot_callbacks task_plot_cb = {
+const struct plot_callbacks task_plot_cb = {
 	.match_time		= task_plot_match_time,
 	.plot_event		= task_plot_event,
 	.start			= task_plot_start,

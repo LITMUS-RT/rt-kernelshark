@@ -47,6 +47,8 @@ enum graph_plot_type {
 	PLOT_TYPE_TASK,
 	PLOT_TYPE_RT_TASK,
 	PLOT_TYPE_RT_CPU,
+	PLOT_TYPE_SERVER_TASK,
+	PLOT_TYPE_SERVER_CPU
 };
 
 enum plot_time_type {

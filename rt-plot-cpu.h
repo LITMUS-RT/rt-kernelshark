@@ -10,6 +10,8 @@ struct rt_cpu_info {
 	char			*label;
 };
 
+const struct plot_callbacks rt_cpu_cb;
+
 void rt_plot_labeled_cpu(struct graph_info *ginfo, int cpu, char *label);
 void rt_plot_cpu(struct graph_info *ginfo, int cpu);
 void rt_plot_cpus_plotted(struct graph_info *ginfo,

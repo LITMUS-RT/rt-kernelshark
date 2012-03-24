@@ -4,8 +4,10 @@
 #include <gtk/gtk.h>
 #include "task-list.h"
 #include "trace-cmd.h"
+#include "rt-plot.h"
 #include "rt-plot-task.h"
 #include "rt-plot-cpu.h"
+#include "rt-plot-container.h"
 
 #define LLABEL 30
 #define SEARCH_PERIODS 3
@@ -102,6 +104,7 @@ struct rt_graph_info {
 	unsigned long long	max_period;
 };
 
+
 /*
  * A list of cached time-stamp fields
  */
@@ -134,6 +137,7 @@ struct vcpu_list {
 struct cont_list {
 	struct cont_list	*next;
 	gint			cid;
+	gboolean		plotted;
 	const char*		name;
 	struct vcpu_list	*vcpus;
 };
@@ -173,7 +177,7 @@ int rt_graph_check_server_param(struct graph_info *ginfo, struct record *record,
 int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 				    struct record *record,
 				    gint *sid, gint *job, gint *tid,
-				    unsigned long long *when);
+				      unsigned long long *when);
 int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 				      struct record *record,
 				      gint *sid, gint *job, gint *tid,
@@ -185,7 +189,8 @@ int rt_graph_check_server_release(struct graph_info *ginfo,
 				  unsigned long long *deadline);
 int rt_graph_check_server_completion(struct graph_info *ginfo,
 				     struct record *record,
-				     gint *sid, gint *job);
+				     gint *sid, gint *job,
+				     unsigned long long *when);
 int rt_graph_check_server_block(struct graph_info *ginfo,
 				struct record *record, gint *pid,
 				unsigned long long *when);
@@ -193,15 +198,12 @@ int rt_graph_check_server_resume(struct graph_info *ginfo, struct record *record
 				 gint *pid, unsigned long long *when);
 void init_rt_event_cache(struct rt_graph_info *rtinfo);
 
-/* Methods for dealing with RT timestamps */
 unsigned long long get_rts(struct graph_info *ginfo,
 			   struct record *record);
-unsigned long long next_rts(struct graph_info *ginfo, int cpu,
-			    unsigned long long ft_target);
-void set_cpu_to_rts(struct graph_info *ginfo,
-		    unsigned long long rt_target, int cpu);
-void set_cpus_to_rts(struct graph_info *ginfo,
-		     unsigned long long rt_target);
+
+
+/* Other */
+struct cont_list* find_container(struct cont_list **conts, gint cid, gint key);
 
 static inline void nano_to_milli(unsigned long long time,
 				 unsigned long long *msec,
@@ -215,5 +217,12 @@ static inline float nano_as_milli(unsigned long long time)
 {
 	return (float)time / 1000000ULL;
 }
+
+static inline int get_container_key(gint cid)
+{
+	return trace_hash(cid) % CONT_HASH_SIZE;
+}
+
+#define max_rt_search(ginfo) (SEARCH_PERIODS*ginfo->rtg_info.max_period)
 
 #endif
