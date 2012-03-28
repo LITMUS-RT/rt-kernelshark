@@ -57,6 +57,9 @@ void set_cpu_to_rts(struct graph_info *ginfo,
 		    unsigned long long rt_target, int cpu);
 void set_cpus_to_rts(struct graph_info *ginfo,
 		     unsigned long long rt_target);
+int is_task_running(struct graph_info *ginfo,
+		    unsigned long long time,
+		    int pid);
 struct record* get_previous_release(struct graph_info *ginfo, int tid,
 				    unsigned long long time, int *job,
 				    unsigned long long *release,

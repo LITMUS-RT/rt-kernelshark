@@ -2,7 +2,7 @@
 #include <string.h>
 #include "trace-graph.h"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 4
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -124,8 +124,7 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 	if (match && sid == vcpu_info->sid) {
 		update_tid(vcpu_info, tid);
 
-		if (vcpu_info->run_time && vcpu_info->run_time < ts &&
-		    job != 1) {
+		if (vcpu_info->run_time < ts) {
 			info->box = TRUE;
 			info->bcolor = hash_pid(tid);
 			info->bfill = vcpu_info->running;
@@ -214,13 +213,38 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 	return ret;
 }
 
-
 static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 			struct plot_info *info)
 {
-	/* TODO: me */
-}
+	int tid, job, is_running;
+	unsigned long long deadline, release;
+	struct record *record;
 
+	if (vcpu_info->run_time && vcpu_info->run_cpu != NO_CPU) {
+		info->box = TRUE;
+		info->bcolor = hash_pid(vcpu_info->run_tid);
+		info->bfill = vcpu_info->running;
+		info->bstart = vcpu_info->run_time;
+		info->bend = ginfo->view_end_time;
+		info->blabel = vcpu_info->label;
+	} else if (vcpu_info->fresh) {
+		is_running = get_server_info(ginfo,
+					     (struct rt_plot_common*)vcpu_info,
+					     vcpu_info->sid,
+					     ginfo->view_end_time,
+					     &release, &deadline,
+					     &job, &tid, &record);
+		if (is_running) {
+			update_tid(vcpu_info, tid);
+			info->box = TRUE;
+			info->bcolor = hash_pid(vcpu_info->run_tid);
+			info->bfill = is_task_running(ginfo, ginfo->view_end_time, tid);
+			info->bstart = vcpu_info->run_time;
+			info->bend = ginfo->view_end_time;
+			info->blabel = vcpu_info->label;
+		}
+	}
+}
 
 static int rt_vcpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			     struct record *record, struct plot_info *info)
@@ -261,8 +285,7 @@ static void rt_vcpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 	vcpu_info->fresh = TRUE;
 	vcpu_info->running = FALSE;
 
-	vcpu_info->run_tid = -1;
-	update_tid(vcpu_info, 0);
+	vcpu_info->run_tid = 0;
 }
 
 static void rt_vcpu_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
