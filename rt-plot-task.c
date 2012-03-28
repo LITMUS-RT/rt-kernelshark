@@ -3,7 +3,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define DEBUG_LEVEL 4
+#define DEBUG_LEVEL 0
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\

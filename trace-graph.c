@@ -1695,7 +1695,7 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 			   fill,
 			   x1, y,
 			   x2 - x1, size);
-	if (!thin && is_high_res(ginfo)) {
+	if (!thin && fill && is_high_res(ginfo)) {
 		gdk_draw_rectangle(ginfo->curr_pixmap,
 				   ginfo->draw->style->black_gc,
 				   FALSE,
