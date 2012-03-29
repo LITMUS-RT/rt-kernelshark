@@ -36,19 +36,19 @@ rt_plot_match_time(struct graph_info *ginfo, struct graph_plot *plot,
 		   unsigned long long time);
 struct record*
 __find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt,
-		 guint64 time, int display);
+		 guint64 time, int display, unsigned long long range);
 
 static inline struct record*
 find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt, guint64 time)
 {
-	return __find_rt_record(ginfo, rt, time, 0);
+	return __find_rt_record(ginfo, rt, time, 0, 0);
 }
 
 static inline struct record*
 find_rt_display_record(struct graph_info *ginfo,
 		       struct rt_plot_common *rt, guint64 time)
 {
-	return __find_rt_record(ginfo, rt, time, 1);
+	return __find_rt_record(ginfo, rt, time, 1, 0);
 }
 
 unsigned long long next_rts(struct graph_info *ginfo, int cpu,

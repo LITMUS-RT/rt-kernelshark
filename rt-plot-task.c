@@ -3,7 +3,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define DEBUG_LEVEL 0
+#define DEBUG_LEVEL 1
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -73,6 +73,18 @@ static int update_job(struct rt_task_info *rtt_info, int job)
 			 rtt_info->pid, rtt_info->last_job);
 	}
 	return 1;
+}
+
+static int rt_task_plot_is_drawn(struct graph_info *ginfo, int eid)
+{
+	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+
+	return (eid == rtg_info->switch_away_id     ||
+		eid == rtg_info->switch_to_id       ||
+		eid == rtg_info->task_completion_id ||
+		/* eid == rtg_info->task_block_id      || */
+		/* eid == rtg_info->task_resume_id     || */
+		eid == rtg_info->task_release_id);
 }
 
 /*
@@ -203,8 +215,8 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	if (match && pid == rtt_info->pid) {
 		rtt_info->fresh = FALSE;
 		rtt_info->block_time = ts;
-		rtt_info->block_cpu = NO_CPU;
-		dprintf(3, "Resume for %d on %d at %llu\n",
+		rtt_info->block_cpu = record->cpu;
+		dprintf(3, "Block for %d on %d at %llu\n",
 			pid, record->cpu, ts);
 		ret = 1;
 	}
@@ -292,7 +304,7 @@ static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info
 static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		   struct record *record, struct plot_info *info)
 {
-	int pid, eid, epid, my_pid, my_cpu, not_sa, not_ss, ret = 0;
+	int pid, eid, epid, my_pid, my_cpu, not_sa, not_ss, not_drawn, ret = 0;
 	unsigned long long ts;
 
 	pid = rtt_info->pid;
@@ -302,8 +314,9 @@ static int try_other(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	my_cpu = (rtt_info->run_time && record->cpu == rtt_info->run_cpu);
 	not_sa = (eid != ginfo->rtg_info.switch_away_id);
 	not_ss = (eid != ginfo->event_sched_switch_id);
+	not_drawn = (!rt_task_plot_is_drawn(ginfo, eid));
 
-	if ((my_pid || my_cpu) && not_ss && not_sa) {
+	if ((my_pid || my_cpu) && not_ss && not_sa && not_drawn) {
 		info->line = TRUE;
 		info->lcolor = hash_pid(record->cpu);
 		info->ltime = ts;
@@ -448,18 +461,6 @@ rt_task_plot_record_matches(struct rt_plot_common *rt,
 }
 
 
-static int rt_task_plot_is_drawn(struct graph_info *ginfo, int eid)
-{
-	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
-
-	return (eid == rtg_info->switch_away_id     ||
-		eid == rtg_info->switch_to_id       ||
-		eid == rtg_info->task_completion_id ||
-		eid == rtg_info->task_block_id      ||
-		eid == rtg_info->task_resume_id     ||
-		eid == rtg_info->task_release_id);
-}
-
 static struct record*
 rt_task_plot_write_header(struct rt_plot_common *rt,
 			  struct graph_info *ginfo,
@@ -467,7 +468,7 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 			  unsigned long long time)
 {
 	const char *comm;
-	int pid, job, found;
+	int pid, job = -1, found;
 	struct record *record;
 	unsigned long long release, deadline;
 	struct rt_task_info *rtt_info = (struct rt_task_info*)rt;

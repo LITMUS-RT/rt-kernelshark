@@ -10,7 +10,7 @@
 #include "rt-plot-container.h"
 
 #define LLABEL 30
-#define SEARCH_PERIODS 1
+#define SEARCH_PERIODS 5
 #define NO_CPU -1
 #define RT_TS_FIELD "__rt_ts"
 

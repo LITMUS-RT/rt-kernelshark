@@ -7,13 +7,20 @@
  */
 struct record*
 __find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
-		 guint64 time, int display)
+		 guint64 time, int display, unsigned long long range)
 {
 	int next_cpu, match, eid, ignored;
 	struct record *record;
 
 	set_cpus_to_rts(ginfo, time);
 	while ((record = tracecmd_read_next_data(ginfo->handle, &next_cpu))) {
+
+		if (range && get_rts(ginfo, record) >= time + range) {
+			free_record(record);
+			record = NULL;
+			break;
+		}
+
 		eid = pevent_data_type(ginfo->pevent, record);
 		ignored = (eid == ginfo->event_sched_switch_id);
 		if (!ignored && display) {
@@ -65,14 +72,17 @@ rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
 }
 
 static struct record*
-find_prev_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
-		 unsigned long long time)
+find_prev_display_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
+		 unsigned long long time, unsigned long long range)
 {
 	int eid, ignored, match, cpu;
 	struct record *prev, *res = NULL;
 	unsigned long long min_ts;
 
-	min_ts = time - max_rt_search(ginfo);
+	if (range)
+		min_ts = time - range;
+	else
+		min_ts = time - max_rt_search(ginfo);
 
 	set_cpus_to_rts(ginfo, time);
 
@@ -111,17 +121,25 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 	struct rt_plot_common *rt_info = plot->private;
 	struct event_format *event;
 	struct record *record, *prev_record;
-	unsigned long long msec, nsec, rts;
+	unsigned long long msec, nsec, rts, ptime, rtime, range;
+	long long pdiff, rdiff;
 	int eid;
 
-	record = rt_info->write_header(rt_info, ginfo, s, time);
-	prev_record = find_prev_record(ginfo, rt_info, time);
+	rt_info->write_header(rt_info, ginfo, s, time);
 
-	if (!record || (prev_record && prev_record != record &&
-			(time - get_rts(ginfo, prev_record)) <
-			(get_rts(ginfo, record) - time))) {
-			free_record(record);
-			record = prev_record;
+	/* Stupid, fix to use resolution */
+	range = 2 / ginfo->resolution;
+	record = __find_rt_record(ginfo, rt_info, time, 1, range);
+	prev_record = find_prev_display_record(ginfo, rt_info, time, range);
+
+	if (!record) {
+		record = prev_record;
+	} else if (prev_record) {
+		ptime = get_rts(ginfo, prev_record);
+		rtime = get_rts(ginfo, record);
+		pdiff = (ptime < time) ? time - ptime : ptime - time;
+		rdiff = (rtime < time) ? time - rtime : rtime - time;
+		record = (pdiff < rdiff) ? prev_record : record;
 	}
 
 	if (record) {
@@ -137,6 +155,8 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 				pevent_event_info(s, event, record);
 			} else
 				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
+		} else {
+			trace_seq_printf(s, "Failsauce\n");
 		}
 		trace_seq_putc(s, '\n');
 		nano_to_milli(time, &msec, &nsec);
@@ -349,15 +369,19 @@ struct record* get_previous_release(struct graph_info *ginfo, int match_tid,
 	unsigned long long release, deadline, min_ts;
 	struct record *last_rec = NULL, *rec, *ret = NULL;
 
+	*out_job = -2;
+
 	min_ts = time - max_rt_search(ginfo);
 
 	/* The release record could have occurred on any CPU. Search all */
 	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
+		set_cpu_to_rts(ginfo, time, cpu);
 		last_rec = tracecmd_peek_data(ginfo->handle, cpu);
 
 		/* Require a record to start with */
-		if (!last_rec)
+		if (!last_rec) {
 			goto loop_end;
+		}
 		last_rec->ref_count++;
 
 		while ((rec = tracecmd_read_prev(ginfo->handle, last_rec))) {
@@ -384,7 +408,6 @@ struct record* get_previous_release(struct graph_info *ginfo, int match_tid,
 					*out_release = release;
 					*out_deadline = deadline;
 				}
-
 				last_rec = NULL;
 				goto loop_end;
 			}
