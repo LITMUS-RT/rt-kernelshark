@@ -4,40 +4,6 @@
 #include "trace-hash.h"
 #include "trace-filter.h"
 
-struct vtask_info {
-	struct rt_task_info 	task_info;
-	struct cont_list	*cont;
-};
-
-static void insert_vtask(struct graph_info *ginfo, struct cont_list *cont,
-			 struct vcpu_list *vcpu_info)
-{
-	struct graph_plot *plot;
-	struct vtask_info *vtask;
-	char *label;
-	int len;
-
-	vtask = malloc_or_die(sizeof(*vtask));
-	vtask->task_info.pid = vcpu_info->sid;
-	vtask->task_info.wcet = vcpu_info->params.wcet;
-	vtask->task_info.period = vcpu_info->params.period;
-	vtask->task_info.label = malloc_or_die(LLABEL);
-	vtask->cont = cont;
-
-	g_assert(cont);
-
-	len = strlen(cont->name) + 100;
-	label = malloc_or_die(len);
-	snprintf(label, len, "%s-%d\n(%1.1f, %1.1f)",
-		 cont->name, -vtask->task_info.pid,
-		 nano_as_milli(vtask->task_info.wcet),
-		 nano_as_milli(vtask->task_info.period));
-
-	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_SERVER_TASK,
-				       TIME_TYPE_RT, &rt_task_cb, vtask);
-	trace_graph_plot_add_all_recs(ginfo, plot);
-}
-
 int rt_plot_get_containers(struct graph_info *ginfo, gint **conts,
 			    gboolean plotted_only)
 {
@@ -122,7 +88,7 @@ void rt_plot_container(struct graph_info *ginfo, int cid)
 	cont->plotted = TRUE;
 
 	for (vlist = cont->vcpus; vlist; vlist = vlist->next) {
-		/* insert_vtask(ginfo, cont, vlist); */
+		insert_vtask(ginfo, cont, vlist);
 		insert_vcpu(ginfo, cont, vlist);
 	}
 }
@@ -185,7 +151,6 @@ static void do_container_filter(struct graph_info *ginfo,
 				struct cont_filter_helper *helper, gpointer data)
 {
 	struct graph_plot *plot;
-	struct vtask_info *vtask;
 	struct vcpu_info *vcpu;
 	struct cont_list *cont;
 	int i, c, *append;
@@ -201,13 +166,8 @@ static void do_container_filter(struct graph_info *ginfo,
 		    plot->type != PLOT_TYPE_SERVER_CPU)
 			continue;
 
-		if (plot->type == PLOT_TYPE_SERVER_TASK) {
-			vtask = plot->private;
-			cont = vtask->cont;
-		} else {
-			vcpu = plot->private;
-			cont = vcpu->cont;
-		}
+		vcpu = plot->private;
+		cont = vcpu->cont;
 
 		for (c = 0; c < helper->num_conts; c++) {
 			if (helper->conts[c] == cont->cid)

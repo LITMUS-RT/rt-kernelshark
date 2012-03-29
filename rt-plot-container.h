@@ -2,6 +2,7 @@
 #define __RT_PLOT_CONTAINER_H
 
 #include "rt-plot-vcpu.h"
+#include "rt-plot-vtask.h"
 
 typedef void (*cont_dialog_cb_func)(gboolean, gint*, gint*, gpointer);
 
