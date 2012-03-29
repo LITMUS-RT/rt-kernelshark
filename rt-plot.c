@@ -30,7 +30,6 @@ __find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
 	return record;
 }
 
-
 /**
  * rt_plot_display_last_event - write event name at @time onto plot.
  */
@@ -65,6 +64,43 @@ rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
 	return 1;
 }
 
+static struct record*
+find_prev_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
+		 unsigned long long time)
+{
+	int eid, ignored, match, cpu;
+	struct record *prev, *res = NULL;
+	unsigned long long min_ts;
+
+	min_ts = time - max_rt_search(ginfo);
+
+	set_cpus_to_rts(ginfo, time);
+
+	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
+		prev = tracecmd_peek_data(ginfo->handle, cpu);
+		while ((prev = tracecmd_read_prev(ginfo->handle, prev)) &&
+		       get_rts(ginfo, prev) > min_ts) {
+			eid = pevent_data_type(ginfo->pevent, prev);
+			ignored = (eid == ginfo->event_sched_switch_id);
+			if (!ignored) {
+				ignored = rt_info->is_drawn(ginfo, eid);
+			}
+			match = !ignored &&
+				rt_info->record_matches(rt_info, ginfo, prev);
+			if (match) {
+				if (!res ||
+				    get_rts(ginfo, prev) > get_rts(ginfo, res)) {
+					free_record(res);
+					res = prev;
+				}
+				break;
+			}
+			free_record(prev);
+		}
+	}
+	return res;
+}
+
 /**
  * rt_plot_display_info - write information about @time into @s
  */
@@ -74,11 +110,19 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 {
 	struct rt_plot_common *rt_info = plot->private;
 	struct event_format *event;
-	struct record *record;
+	struct record *record, *prev_record;
 	unsigned long long msec, nsec, rts;
 	int eid;
 
 	record = rt_info->write_header(rt_info, ginfo, s, time);
+	prev_record = find_prev_record(ginfo, rt_info, time);
+
+	if (!record || (prev_record && prev_record != record &&
+			(time - get_rts(ginfo, prev_record)) <
+			(get_rts(ginfo, record) - time))) {
+			free_record(record);
+			record = prev_record;
+	}
 
 	if (record) {
 		rts = get_rts(ginfo, record);

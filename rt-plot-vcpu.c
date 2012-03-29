@@ -306,7 +306,7 @@ rt_vcpu_plot_write_header(struct rt_plot_common *rt,
 				   &release, &deadline,
 				   &job, &tid, &record);
 
-	trace_seq_printf(s, "%s-%d:%d", vcpu_info->cont->name,
+	trace_seq_printf(s, "%s-%d\n%d", vcpu_info->cont->name,
 			 vcpu_info->sid, job);
 	if (is_running) {
 		trace_seq_printf(s, " - %d", tid);
