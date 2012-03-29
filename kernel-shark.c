@@ -2401,80 +2401,80 @@ void kernel_shark(int argc, char **argv)
 	gtk_widget_show(widget);
 
 
-	/* --- Tree View Vbox --- */
+	/* /\* --- Tree View Vbox --- *\/ */
 
-	vbox2 = gtk_vbox_new(FALSE, 0);
-	gtk_paned_add2(GTK_PANED(vpaned), vbox2);
-	gtk_widget_show(vbox2);
+	/* vbox2 = gtk_vbox_new(FALSE, 0); */
+	/* gtk_paned_add2(GTK_PANED(vpaned), vbox2); */
+	/* gtk_widget_show(vbox2); */
 
-	/* --- Paging Hbox --- */
+	/* /\* --- Paging Hbox --- *\/ */
 
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0);
-	gtk_widget_show(hbox);
+	/* hbox = gtk_hbox_new(FALSE, 0); */
+	/* gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0); */
+	/* gtk_widget_show(hbox); */
 
-	/* --- Page Spin Button --- */
+	/* /\* --- Page Spin Button --- *\/ */
 
-	label = gtk_label_new("Page");
-	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
-	gtk_widget_show(label);
+	/* label = gtk_label_new("Page"); */
+	/* gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0); */
+	/* gtk_widget_show(label); */
 
-	spin = gtk_spin_button_new(NULL, 1.0, 0);
-	gtk_spin_button_set_range(GTK_SPIN_BUTTON(spin), 1, 1);
-	gtk_box_pack_start(GTK_BOX(hbox), spin, FALSE, FALSE, 0);
-	gtk_widget_show(spin);
+	/* spin = gtk_spin_button_new(NULL, 1.0, 0); */
+	/* gtk_spin_button_set_range(GTK_SPIN_BUTTON(spin), 1, 1); */
+	/* gtk_box_pack_start(GTK_BOX(hbox), spin, FALSE, FALSE, 0); */
+	/* gtk_widget_show(spin); */
 
-	info->spin = spin;
+	/* info->spin = spin; */
 
-	/* --- Search --- */
+	/* /\* --- Search --- *\/ */
 
-	/* The tree needs its columns loaded now */
-	info->treeview = gtk_tree_view_new();
-	trace_view_load(info->treeview, handle, spin);
+	/* /\* The tree needs its columns loaded now *\/ */
+	/* info->treeview = gtk_tree_view_new(); */
+	/* trace_view_load(info->treeview, handle, spin); */
 
-	label = gtk_label_new("      Search: ");
-	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
-	gtk_widget_show(label);
+	/* label = gtk_label_new("      Search: "); */
+	/* gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0); */
+	/* gtk_widget_show(label); */
 
-	trace_view_search_setup(GTK_BOX(hbox), GTK_TREE_VIEW(info->treeview));
+	/* trace_view_search_setup(GTK_BOX(hbox), GTK_TREE_VIEW(info->treeview)); */
 
-	check = gtk_check_button_new_with_label("graph follows");
-	gtk_box_pack_start(GTK_BOX(hbox), check, TRUE, TRUE, 0);
-	gtk_widget_show(check);
+	/* check = gtk_check_button_new_with_label("graph follows"); */
+	/* gtk_box_pack_start(GTK_BOX(hbox), check, TRUE, TRUE, 0); */
+	/* gtk_widget_show(check); */
 
-	g_signal_connect_swapped (check, "toggled",
-				  G_CALLBACK (graph_check_toggle),
-				  (gpointer) info);
+	/* g_signal_connect_swapped (check, "toggled", */
+	/* 			  G_CALLBACK (graph_check_toggle), */
+	/* 			  (gpointer) info); */
 
 
-	/* --- Top Level Trace View Paging Hbox --- */
+	/* /\* --- Top Level Trace View Paging Hbox --- *\/ */
 
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(vbox2), hbox, TRUE, TRUE, 0);
-	gtk_widget_show(hbox);
+	/* hbox = gtk_hbox_new(FALSE, 0); */
+	/* gtk_box_pack_start(GTK_BOX(vbox2), hbox, TRUE, TRUE, 0); */
+	/* gtk_widget_show(hbox); */
 
-	/* --- Scroll Window --- */
-	scrollwin = gtk_scrolled_window_new(NULL, NULL);
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollwin),
-				       GTK_POLICY_AUTOMATIC,
-				       GTK_POLICY_AUTOMATIC);
-	gtk_box_pack_start(GTK_BOX (hbox), scrollwin, TRUE, TRUE, 0);
-	gtk_widget_show(scrollwin);
+	/* /\* --- Scroll Window --- *\/ */
+	/* scrollwin = gtk_scrolled_window_new(NULL, NULL); */
+	/* gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrollwin), */
+	/* 			       GTK_POLICY_AUTOMATIC, */
+	/* 			       GTK_POLICY_AUTOMATIC); */
+	/* gtk_box_pack_start(GTK_BOX (hbox), scrollwin, TRUE, TRUE, 0); */
+	/* gtk_widget_show(scrollwin); */
 
-	/* --- Set up Trace Tree --- */
+	/* /\* --- Set up Trace Tree --- *\/ */
 
-	g_signal_connect(info->treeview, "row-activated",
-			 (GCallback)row_double_clicked, info);
+	/* g_signal_connect(info->treeview, "row-activated", */
+	/* 		 (GCallback)row_double_clicked, info); */
 
-	g_signal_connect(info->treeview, "cursor-changed",
-			 (GCallback)cursor_changed, info);
+	/* g_signal_connect(info->treeview, "cursor-changed", */
+	/* 		 (GCallback)cursor_changed, info); */
 
-	gtk_container_add(GTK_CONTAINER(scrollwin), info->treeview);
+	/* gtk_container_add(GTK_CONTAINER(scrollwin), info->treeview); */
 
-	gtk_signal_connect(GTK_OBJECT(info->treeview), "button_press_event",
-			   (GtkSignalFunc) button_press_event, info);
+	/* gtk_signal_connect(GTK_OBJECT(info->treeview), "button_press_event", */
+	/* 		   (GtkSignalFunc) button_press_event, info); */
 
-	gtk_widget_show(info->treeview);
+	/* gtk_widget_show(info->treeview); */
 
 	/* --- Set up Status Bar --- */
 

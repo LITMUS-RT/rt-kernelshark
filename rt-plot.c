@@ -71,6 +71,9 @@ rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
 	return 1;
 }
 
+/*
+ * Return first displayed record before @time, abandoning search after @range.
+ */
 static struct record*
 find_prev_display_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
 		 unsigned long long time, unsigned long long range)
@@ -120,15 +123,17 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 {
 	struct rt_plot_common *rt_info = plot->private;
 	struct event_format *event;
-	struct record *record, *prev_record;
+	struct record *record, *prev_record, *data_record;
 	unsigned long long msec, nsec, rts, ptime, rtime, range;
 	long long pdiff, rdiff;
 	int eid;
 
-	rt_info->write_header(rt_info, ginfo, s, time);
+	/* Write plot-specific data */
+	data_record = rt_info->write_header(rt_info, ginfo, s, time);
 
-	/* Stupid, fix to use resolution */
+	/* Select closest relevant record */
 	range = 2 / ginfo->resolution;
+
 	record = __find_rt_record(ginfo, rt_info, time, 1, range);
 	prev_record = find_prev_display_record(ginfo, rt_info, time, range);
 
@@ -142,6 +147,7 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 		record = (pdiff < rdiff) ? prev_record : record;
 	}
 
+	/* Write event info */
 	if (record) {
 		rts = get_rts(ginfo, record);
 		eid = pevent_data_type(ginfo->pevent, record);
@@ -155,14 +161,17 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 				pevent_event_info(s, event, record);
 			} else
 				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
-		} else {
-			trace_seq_printf(s, "Failsauce\n");
 		}
-		trace_seq_putc(s, '\n');
-		nano_to_milli(time, &msec, &nsec);
-		trace_seq_printf(s, "%llu.%06llu ms CPU: %03d",
-				 msec, nsec, record->cpu);
 		free_record(record);
+	}
+
+	/* Metadata */
+	trace_seq_putc(s, '\n');
+	nano_to_milli(time, &msec, &nsec);
+	trace_seq_printf(s, "%llu.%06llu ms", msec, nsec);
+	if (data_record) {
+		trace_seq_printf(s, " CPU: %03d", data_record->cpu);
+		free_record(data_record);
 	}
 
 	return 1;

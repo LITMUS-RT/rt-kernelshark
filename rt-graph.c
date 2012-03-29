@@ -462,6 +462,7 @@ int rt_graph_check_task_block(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		dprintf(2, "Found task_block id %d\n", event->id);
+		rtg_info->task_block_id = event->id;
 		STORE_FIELD(rtg_info, event, block, pid);
 	}
 
@@ -498,6 +499,7 @@ int rt_graph_check_task_resume(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		dprintf(2, "Found task_resume id %d\n", event->id);
+		rtg_info->task_resume_id = event->id;
 		STORE_FIELD(rtg_info, event, resume, pid);
 	}
 

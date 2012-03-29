@@ -3,7 +3,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define DEBUG_LEVEL 1
+#define DEBUG_LEVEL 5
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -219,6 +219,8 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		dprintf(3, "Block for %d on %d at %llu\n",
 			pid, record->cpu, ts);
 		ret = 1;
+	} else {
+		dprintf(3, "%d does not match my pid %d\n", pid, rtt_info->pid);
 	}
 	return ret;
 }
