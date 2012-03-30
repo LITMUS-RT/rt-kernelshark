@@ -13,8 +13,10 @@ struct rt_task_info {
 	/* For drawing squares */
 	unsigned long long	run_time;
 	int			run_cpu;
+
 	unsigned long long	block_time;
 	int			block_cpu;
+	int			block_lid;
 
 	/* For managing state */
 	int			last_job;
@@ -25,6 +27,7 @@ struct rt_task_info {
 	gboolean		params_found;
 	gboolean		fresh;
 	char			*label;
+	char			*block_label;
 };
 
 const struct plot_callbacks rt_task_cb;

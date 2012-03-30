@@ -80,6 +80,14 @@ struct plot_info {
 
 	gboolean		completion;
 	unsigned long long	ctime;
+
+	gboolean		ubox;
+	unsigned long long	ubtime;
+	char			*ublabel;
+
+	gboolean		dbox;
+	unsigned long long	dbtime;
+	char			*dblabel;
 };
 
 /*

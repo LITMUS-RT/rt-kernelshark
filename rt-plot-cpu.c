@@ -276,6 +276,9 @@ static void do_plot_end(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	int pid;
 	struct record *record;
 
+	if (ginfo->view_end_time == ginfo->end_time)
+		return;
+
 	if (rtc_info->rt_run_time && rtc_info->run_pid) {
 		info->box = TRUE;
 		info->bcolor = hash_pid(rtc_info->run_pid);
@@ -359,8 +362,8 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		rt_graph_check_container_param(ARG, &dchar);
 		rt_graph_check_server_param(ARG, &dint, &dull, &dull);
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
-		rt_graph_check_task_block(ARG, &dull);
-		rt_graph_check_task_resume(ARG, &dull);
+		rt_graph_check_task_block(ARG, &dint, &dull);
+		rt_graph_check_task_resume(ARG, &dint,  &dull);
 		rt_graph_check_any(ARG, &eid, &ts);
 #undef ARG
 

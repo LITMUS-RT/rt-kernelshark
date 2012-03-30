@@ -131,6 +131,9 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 	unsigned long long deadline, release;
 	struct record *record;
 
+	if (ginfo->view_end_time == ginfo->end_time)
+		return;
+
 	if (vcpu_info->run_time && vcpu_info->run_cpu != NO_CPU) {
 		info->box = TRUE;
 		info->bcolor = hash_pid(vcpu_info->run_tid);
@@ -170,8 +173,8 @@ static int rt_vcpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 
 	match = try_server_switch_away(ginfo, vcpu_info, record, info) ||
 		try_server_switch_to(ginfo, vcpu_info, record, info) ||
-		vcpu_try_block(ginfo, vcpu_info, record, info) ||
-		vcpu_try_resume(ginfo, vcpu_info, record, info) ||
+		/* vcpu_try_block(ginfo, vcpu_info, record, info) || */
+		/* vcpu_try_resume(ginfo, vcpu_info, record, info) || */
 		vcpu_try_release(ginfo, vcpu_info, record, info) ||
 		vcpu_try_completion(ginfo, vcpu_info, record, info) ||
 		try_switch_to(ginfo, vcpu_info, record, info) ||
@@ -265,9 +268,9 @@ int rt_vcpu_plot_record_matches(struct rt_plot_common *rt,
 	match = rt_graph_check_server_switch_to(ARG, &dint, &dint, &dull)   ||
 		rt_graph_check_server_switch_away(ARG, &dint, &dint, &dull) ||
 		rt_graph_check_server_completion(ARG, &dint, &dull)  ||
-		rt_graph_check_server_release(ARG, &dint, &dull, &dull)     ||
-		rt_graph_check_server_block(ARG, &dull)			    ||
-		rt_graph_check_server_resume(ARG, &dull);
+		rt_graph_check_server_release(ARG, &dint, &dull, &dull);
+		/* rt_graph_check_server_block(ARG, &dull)		    || */
+		/* rt_graph_check_server_resume(ARG, &dull); */
 #undef ARG
 	return (sid == vcpu_info->sid);
 }
@@ -364,55 +367,55 @@ int vcpu_try_completion(struct graph_info *ginfo,
 	return ret;
 }
 
-/**
- * vcpu_try_block - start block box if record matches
- */
-int vcpu_try_block(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
-		   struct record *record, struct plot_info *info)
-{
-	int sid, match, ret = 0;
-	unsigned long long ts;
+/* /\** */
+/*  * vcpu_try_block - start block box if record matches */
+/*  *\/ */
+/* int vcpu_try_block(struct graph_info *ginfo, struct vcpu_info *vcpu_info, */
+/* 		   struct record *record, struct plot_info *info) */
+/* { */
+/* 	int sid, match, ret = 0; */
+/* 	unsigned long long ts; */
 
-	match = rt_graph_check_server_block(ginfo, record, &sid, &ts);
-	if (match && sid == vcpu_info->sid) {
-		vcpu_info->fresh = FALSE;
-		vcpu_info->block_time = ts;
-		vcpu_info->block_cpu = NO_CPU;
-		dprintf(3, "VCPU resume for %d on %d at %llu\n",
-			sid, record->cpu, ts);
-		ret = 1;
-	}
-	return ret;
-}
+/* 	match = rt_graph_check_server_block(ginfo, record, &sid, &ts); */
+/* 	if (match && sid == vcpu_info->sid) { */
+/* 		vcpu_info->fresh = FALSE; */
+/* 		vcpu_info->block_time = ts; */
+/* 		vcpu_info->block_cpu = NO_CPU; */
+/* 		dprintf(3, "VCPU resume for %d on %d at %llu\n", */
+/* 			sid, record->cpu, ts); */
+/* 		ret = 1; */
+/* 	} */
+/* 	return ret; */
+/* } */
 
-/**
- * vcpu_try_resume - end block box if record matches
- */
-int vcpu_try_resume(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
-		    struct record *record, struct plot_info *info)
-{
-	int sid, match, ret = 0;
-	unsigned long long ts;
+/* /\** */
+/*  * vcpu_try_resume - end block box if record matches */
+/*  *\/ */
+/* int vcpu_try_resume(struct graph_info *ginfo, struct vcpu_info *vcpu_info, */
+/* 		    struct record *record, struct plot_info *info) */
+/* { */
+/* 	int sid, match, ret = 0; */
+/* 	unsigned long long ts; */
 
-	match = rt_graph_check_server_resume(ginfo, record, &sid, &ts);
+/* 	match = rt_graph_check_server_resume(ginfo, record, &sid, &ts); */
 
-	if (match && sid == vcpu_info->sid) {
-		info->box = TRUE;
-		info->bcolor = 0x0;
-		info->bfill = TRUE;
-		info->bthin = TRUE;
-		info->bstart = vcpu_info->block_time;
-		info->bend = ts;
-		vcpu_info->fresh = FALSE;
+/* 	if (match && sid == vcpu_info->sid) { */
+/* 		info->box = TRUE; */
+/* 		info->bcolor = 0x0; */
+/* 		info->bfill = TRUE; */
+/* 		info->bthin = TRUE; */
+/* 		info->bstart = vcpu_info->block_time; */
+/* 		info->bend = ts; */
+/* 		vcpu_info->fresh = FALSE; */
 
-		vcpu_info->block_time = 0ULL;
-		vcpu_info->block_cpu = NO_CPU;
-		dprintf(3, "VCPU resume for %d on %d at %llu\n",
-			sid, record->cpu, ts);
+/* 		vcpu_info->block_time = 0ULL; */
+/* 		vcpu_info->block_cpu = NO_CPU; */
+/* 		dprintf(3, "VCPU resume for %d on %d at %llu\n", */
+/* 			sid, record->cpu, ts); */
 
-		ret = 1;
-	}
-	return ret;
-}
+/* 		ret = 1; */
+/* 	} */
+/* 	return ret; */
+/* } */
 
 

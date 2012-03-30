@@ -55,7 +55,7 @@
 #define PLOT_GIVE	2
 #define PLOT_BEGIN	80
 #define PLOT_SEP	50
-#define MAX_TRI_TIME    10000000
+#define MAX_TRI_TIME    1000000
 #define PLOT_LINE(plot) (PLOT_SEP * (plot) + PLOT_BEGIN + PLOT_SIZE)
 #define PLOT_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE * 2)
 #define PLOT_BOX_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE)
@@ -1695,7 +1695,7 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 			   fill,
 			   x1, y,
 			   x2 - x1, size);
-	if (!thin && fill && is_high_res(ginfo)) {
+	if (!thin && fill && (x2 - x1 > 1)) {
 		gdk_draw_rectangle(ginfo->curr_pixmap,
 				   ginfo->draw->style->black_gc,
 				   FALSE,
@@ -1703,8 +1703,16 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 				   x2 - x1, size);
 	}
 
-	if (label)
-		draw_plot_label(ginfo, label, x1 + 1, y + 1, x2 - x1 - 2);
+	if (label) {
+		if (!thin)
+			draw_plot_label(ginfo, label, x1 + 1,
+					y + 1, x2 - x1 - 2);
+		else
+			draw_plot_label(ginfo, label, (x1 + x2) / 2,
+					y - PLOT_BOX_SIZE,
+					x2 - x1 - 2);
+	}
+
 }
 
 static void draw_plot_release(struct graph_info *ginfo, int i,

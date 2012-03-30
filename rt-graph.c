@@ -448,7 +448,8 @@ int rt_graph_check_task_completion(struct graph_info *ginfo,
  */
 int rt_graph_check_task_block(struct graph_info *ginfo,
 			      struct record *record,
-			      gint *pid, unsigned long long *ts)
+			      gint *pid, gint *lid,
+			      unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	struct pevent *pevent = ginfo->pevent;
@@ -464,16 +465,18 @@ int rt_graph_check_task_block(struct graph_info *ginfo,
 		dprintf(2, "Found task_block id %d\n", event->id);
 		rtg_info->task_block_id = event->id;
 		STORE_FIELD(rtg_info, event, block, pid);
+		STORE_FIELD(rtg_info, event, block, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->task_block_id) {
 		LOAD_INT(rtg_info, record, block, pid, pid);
+		LOAD_INT(rtg_info, record, block, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
-		dprintf(3, "Read task_block (%d) record for task %d\n",
-			id, *pid);
+		dprintf(3, "Read task_block (%d) record on %d for task %d\n",
+			id, *lid, *pid);
 	}
  out:
 	return ret;
@@ -485,7 +488,8 @@ int rt_graph_check_task_block(struct graph_info *ginfo,
  */
 int rt_graph_check_task_resume(struct graph_info *ginfo,
 			       struct record *record,
-			       gint *pid, unsigned long long *ts)
+			       gint *pid, gint *lid,
+			       unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	struct pevent *pevent = ginfo->pevent;
@@ -501,16 +505,18 @@ int rt_graph_check_task_resume(struct graph_info *ginfo,
 		dprintf(2, "Found task_resume id %d\n", event->id);
 		rtg_info->task_resume_id = event->id;
 		STORE_FIELD(rtg_info, event, resume, pid);
+		STORE_FIELD(rtg_info, event, resume, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->task_resume_id) {
 		LOAD_INT(rtg_info, record, resume, pid, pid);
+		LOAD_INT(rtg_info, record, resume, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
-		dprintf(3, "Read task_resume (%d) record for task %d\n",
-			id, *pid);
+		dprintf(3, "Read task_resume (%d) record on %d for task %d\n",
+			id, *lid, *pid);
 	}
  out:
 	return ret;
@@ -781,7 +787,8 @@ int rt_graph_check_server_completion(struct graph_info *ginfo,
  */
 int rt_graph_check_server_block(struct graph_info *ginfo,
 				struct record *record,
-				gint *sid, unsigned long long *ts)
+				gint *sid, gint *lid,
+				unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	struct pevent *pevent = ginfo->pevent;
@@ -795,12 +802,15 @@ int rt_graph_check_server_block(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		dprintf(2, "Found server_block id %d\n", event->id);
+		rtg_info->server_block_id = event->id;
 		STORE_FIELD(rtg_info, event, sblock, sid);
+		STORE_FIELD(rtg_info, event, sblock, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->server_block_id) {
 		LOAD_INT(rtg_info, record, sblock, sid, sid);
+		LOAD_INT(rtg_info, record, sblock, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
@@ -816,7 +826,8 @@ int rt_graph_check_server_block(struct graph_info *ginfo,
  */
 int rt_graph_check_server_resume(struct graph_info *ginfo,
 				 struct record *record,
-				 gint *sid, unsigned long long *ts)
+				 gint *sid, gint *lid,
+				 unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	struct pevent *pevent = ginfo->pevent;
@@ -830,12 +841,15 @@ int rt_graph_check_server_resume(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		dprintf(2, "Found server_resume id %d\n", event->id);
+		rtg_info->server_resume_id = event->id;
 		STORE_FIELD(rtg_info, event, sresume, sid);
+		STORE_FIELD(rtg_info, event, sresume, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->server_resume_id) {
 		LOAD_INT(rtg_info, record, sresume, sid, sid);
+		LOAD_INT(rtg_info, record, sresume, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;

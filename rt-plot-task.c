@@ -42,8 +42,8 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 #define ARG ginfo, record, &pid
 		match = rt_graph_check_switch_to(ARG, &dint, &dull)   ||
 			rt_graph_check_switch_away(ARG, &dint, &dull) ||
-			rt_graph_check_task_block(ARG, &dull)         ||
-			rt_graph_check_task_resume(ARG, &dull);
+			rt_graph_check_task_block(ARG, &dint, &dull)  ||
+			rt_graph_check_task_resume(ARG, &dint, &dull);
 #undef ARG
 		eid = (match) ? pevent_data_type(pevent, record) : 0;
 
@@ -75,6 +75,19 @@ static int update_job(struct rt_task_info *rtt_info, int job)
 	return 1;
 }
 
+static void update_lid(struct rt_task_info *rtt_info, int lid)
+{
+	if (rtt_info->block_lid != lid) {
+		rtt_info->block_lid = lid;
+
+		if (lid)
+			snprintf(rtt_info->block_label, LLABEL,
+				 "%d", rtt_info->block_lid);
+		else
+			snprintf(rtt_info->block_label, LLABEL, " ");
+	}
+}
+
 static int rt_task_plot_is_drawn(struct graph_info *ginfo, int eid)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -82,8 +95,8 @@ static int rt_task_plot_is_drawn(struct graph_info *ginfo, int eid)
 	return (eid == rtg_info->switch_away_id     ||
 		eid == rtg_info->switch_to_id       ||
 		eid == rtg_info->task_completion_id ||
-		/* eid == rtg_info->task_block_id      || */
-		/* eid == rtg_info->task_resume_id     || */
+		eid == rtg_info->task_block_id      ||
+		eid == rtg_info->task_resume_id     ||
 		eid == rtg_info->task_release_id);
 }
 
@@ -208,14 +221,19 @@ static int try_completion(struct graph_info *ginfo,
 static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		     struct record *record, struct plot_info *info)
 {
-	int pid, match, ret = 0;
+	int pid, match, lid, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_block(ginfo, record, &pid, &ts);
+	match = rt_graph_check_task_block(ginfo, record, &pid, &lid, &ts);
 	if (match && pid == rtt_info->pid) {
-		rtt_info->fresh = FALSE;
-		rtt_info->block_time = ts;
-		rtt_info->block_cpu = record->cpu;
+		if (lid || !rtt_info->block_lid) {
+			update_lid(rtt_info, lid);
+			rtt_info->fresh = FALSE;
+			rtt_info->block_time = ts;
+			rtt_info->block_cpu = record->cpu;
+			rtt_info->block_lid = lid;
+		}
+
 		dprintf(3, "Block for %d on %d at %llu\n",
 			pid, record->cpu, ts);
 		ret = 1;
@@ -228,24 +246,34 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		      struct record *record, struct plot_info *info)
 {
-	int pid, match, ret = 0;
+	int pid, match, lid, ret = 0;
 	unsigned long long ts;
 
-	match = rt_graph_check_task_resume(ginfo, record, &pid, &ts);
+	match = rt_graph_check_task_resume(ginfo, record, &pid, &lid, &ts);
 	if (match && pid == rtt_info->pid) {
-		info->box = TRUE;
-		info->bcolor = 0x0;
-		info->bfill = TRUE;
-		info->bthin = TRUE;
-		info->bstart = rtt_info->block_time;
-		info->bend = ts;
-		rtt_info->fresh = FALSE;
+		if (lid == rtt_info->block_lid) {
+			info->box = TRUE;
+			info->bcolor = 0x0;
+			info->bfill = TRUE;
+			info->bthin = TRUE;
+			info->bstart = rtt_info->block_time;
+			info->bend = ts;
 
-		rtt_info->block_time = 0ULL;
-		rtt_info->block_cpu = NO_CPU;
+			printf("drawing block\n");
+			if (lid) {
+				printf("Adding label %s\n", rtt_info->block_label);
+				info->blabel = rtt_info->block_label;
+			}
+
+			rtt_info->block_lid = 0;
+			rtt_info->fresh = FALSE;
+			rtt_info->block_time = 0ULL;
+			rtt_info->block_cpu = NO_CPU;
+
+		}
+
 		dprintf(3, "Resume for %d on %d at %llu\n",
 			pid, record->cpu, ts);
-
 		ret = 1;
 	}
 	return ret;
@@ -334,6 +362,9 @@ static void do_plot_end(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 	struct record *record;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	int eid;
+
+	if (ginfo->view_end_time == ginfo->end_time)
+		return;
 
 	if (rtt_info->run_time && rtt_info->run_cpu != NO_CPU) {
 		/* A box was started, finish it */
@@ -424,6 +455,7 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 		rtt_info->first_rels[i] = 0ULL;
 	rtt_info->last_job = -1;
 	update_job(rtt_info, 0);
+	update_lid(rtt_info, 0);
 }
 
 static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
@@ -455,8 +487,8 @@ rt_task_plot_record_matches(struct rt_plot_common *rt,
 		rt_graph_check_switch_away(ARG, &dint,  &dull)        ||
 		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
 		rt_graph_check_task_completion(ARG, &dint, &dull)     ||
-		rt_graph_check_task_block(ARG, &dull)                 ||
-		rt_graph_check_task_resume(ARG, &dull)		      ||
+		rt_graph_check_task_block(ARG, &dint, &dull)          ||
+		rt_graph_check_task_resume(ARG, &dint, &dull)	      ||
 		rt_graph_check_any(ARG, &dint, &dull);
 #undef ARG
 	return pid == match_pid;
@@ -617,6 +649,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	rtt_info = malloc_or_die(sizeof(*rtt_info));
 	rtt_info->pid = pid;
 	rtt_info->label = malloc_or_die(LLABEL);
+	rtt_info->block_label = malloc_or_die(LLABEL);
 	rtt_info->wcet = params->wcet;
 	rtt_info->period = params->period;
 

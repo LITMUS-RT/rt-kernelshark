@@ -119,6 +119,9 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 	unsigned long long deadline, release;
 	struct record *record;
 
+	if (ginfo->view_end_time == ginfo->end_time)
+		return;
+
 	if (vcpu_info->run_time && vcpu_info->run_cpu != NO_CPU) {
 		info->box = TRUE;
 		info->bcolor = hash_pid(vcpu_info->sid);
@@ -158,8 +161,8 @@ static int rt_vtask_plot_event(struct graph_info *ginfo, struct graph_plot *plot
 
 	match = try_server_switch_away(ginfo, vcpu_info, record, info) ||
 		try_server_switch_to(ginfo, vcpu_info, record, info) ||
-		vcpu_try_block(ginfo, vcpu_info, record, info) ||
-		vcpu_try_resume(ginfo, vcpu_info, record, info) ||
+		/* vcpu_try_block(ginfo, vcpu_info, record, info) || */
+		/* vcpu_try_resume(ginfo, vcpu_info, record, info) || */
 		vcpu_try_release(ginfo, vcpu_info, record, info) ||
 		vcpu_try_completion(ginfo, vcpu_info, record, info) ||
 		try_switch_to(ginfo, vcpu_info, record, info) ||
