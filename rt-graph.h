@@ -76,11 +76,13 @@ struct rt_graph_info {
 	struct format_field	*sswitch_to_sid_field;
 	struct format_field	*sswitch_to_job_field;
 	struct format_field	*sswitch_to_tid_field;
+	struct format_field	*sswitch_to_tjob_field;
 
 	gint			server_switch_away_id;
 	struct format_field	*sswitch_away_sid_field;
 	struct format_field	*sswitch_away_job_field;
 	struct format_field	*sswitch_away_tid_field;
+	struct format_field	*sswitch_away_tjob_field;
 
 	gint			server_release_id;
 	struct format_field	*srelease_sid_field;
@@ -180,11 +182,11 @@ int rt_graph_check_server_param(struct graph_info *ginfo, struct record *record,
 				unsigned long long *period);
 int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 				    struct record *record,
-				    gint *sid, gint *job, gint *tid,
+				    gint *sid, gint *job, gint *tid, gint *tjob,
 				      unsigned long long *when);
 int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 				      struct record *record,
-				      gint *sid, gint *job, gint *tid,
+				      gint *sid, gint *job, gint *tid, gint *tjob,
 				      unsigned long long *when);
 int rt_graph_check_server_release(struct graph_info *ginfo,
 				  struct record *record,

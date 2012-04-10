@@ -3,7 +3,7 @@
 #include "trace-graph.h"
 #include "trace-filter.h"
 
-#define DEBUG_LEVEL 5
+#define DEBUG_LEVEL 4
 #if DEBUG_LEVEL > 0
 #define dprintf(l, x...)			\
 	do {					\
@@ -237,9 +237,7 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		dprintf(3, "Block for %d on %d at %llu\n",
 			pid, record->cpu, ts);
 		ret = 1;
-	} else {
-		dprintf(3, "%d does not match my pid %d\n", pid, rtt_info->pid);
-	}
+	} 
 	return ret;
 }
 
@@ -259,9 +257,7 @@ static int try_resume(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 			info->bstart = rtt_info->block_time;
 			info->bend = ts;
 
-			printf("drawing block\n");
 			if (lid) {
-				printf("Adding label %s\n", rtt_info->block_label);
 				info->blabel = rtt_info->block_label;
 			}
 
@@ -328,6 +324,7 @@ static int try_switch_to(struct graph_info *ginfo, struct rt_task_info *rtt_info
 			pid, job, record->cpu, ts);
 		ret = 1;
 	}
+
 	return ret;
 }
 
@@ -417,8 +414,6 @@ static int rt_task_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 	struct rt_task_info *rtt_info = plot->private;
 	int match;
 
-	dprintf(4,"%s\n", __FUNCTION__);
-
 	/* No more records, finish what we started */
 	if (!record) {
 		do_plot_end(ginfo, rtt_info, info);
@@ -443,8 +438,6 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 	int i;
 	struct rt_task_info *rtt_info = plot->private;
 
-	dprintf(4,"%s\n", __FUNCTION__);
-
 	rtt_info->run_time = time;
 	rtt_info->block_time = time;
 	rtt_info->run_cpu = NO_CPU;
@@ -454,14 +447,13 @@ static void rt_task_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 	for (i = 0; i < 3; i++)
 		rtt_info->first_rels[i] = 0ULL;
 	rtt_info->last_job = -1;
-	update_job(rtt_info, 0);
+	update_job(rtt_info, -1);
 	update_lid(rtt_info, 0);
 }
 
 static void rt_task_plot_destroy(struct graph_info *ginfo, struct graph_plot *plot)
 {
 	struct rt_task_info *rtt_info = plot->private;
-	dprintf(4,"%s\n", __FUNCTION__);
 	trace_graph_plot_remove_all_recs(ginfo, plot);
 	free(rtt_info->label);
 	free(rtt_info);
@@ -506,8 +498,6 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 	struct record *record;
 	unsigned long long release, deadline;
 	struct rt_task_info *rtt_info = (struct rt_task_info*)rt;
-
-	dprintf(4,"%s\n", __FUNCTION__);
 
 	found = get_time_info(ginfo, rtt_info, time,
 			      &job, &release, &deadline, &record);

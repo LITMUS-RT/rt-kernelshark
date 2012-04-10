@@ -26,11 +26,11 @@ int get_server_info(struct graph_info *ginfo, struct rt_plot_common *rt,
 		    int match_sid, unsigned long long time,
 		    unsigned long long *out_release,
 		    unsigned long long *out_deadline,
-		    int *out_job, int *out_tid,
+		    int *out_job, int *out_tid, int *out_tjob,
 		    struct record **out_record)
 {
 	struct record *record;
-	int sid, job, tid, match, next_cpu, is_running = 0;
+	int sid, job, tid, tjob, match, next_cpu, is_running = 0;
 	unsigned long long when, max_ts;
 
 	*out_record = find_rt_record(ginfo, rt, time);
@@ -55,10 +55,11 @@ int get_server_info(struct graph_info *ginfo, struct rt_plot_common *rt,
 			break;
 
 		match = rt_graph_check_server_switch_away(ginfo, record,
-							  &sid, &job, &tid,
+							  &sid, &job, &tid, &tjob,
 							  &when);
 		if (match && sid == match_sid) {
 			*out_tid = tid;
+			*out_tjob = tjob;
 			is_running = 1;
 			break;
 		}
@@ -88,8 +89,9 @@ void rt_plot_container(struct graph_info *ginfo, int cid)
 	cont->plotted = TRUE;
 
 	for (vlist = cont->vcpus; vlist; vlist = vlist->next) {
-		insert_vtask(ginfo, cont, vlist);
 		insert_vcpu(ginfo, cont, vlist);
+		if (vlist->params.wcet && vlist->params.period)
+			insert_vtask(ginfo, cont, vlist);
 	}
 }
 

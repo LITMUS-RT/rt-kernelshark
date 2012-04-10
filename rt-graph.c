@@ -255,7 +255,7 @@ int rt_graph_check_task_param(struct graph_info *ginfo,
 	if (id == rtg_info->task_param_id) {
 		LOAD_INT(rtg_info, record, param, pid, pid);
 		LOAD_LONG(rtg_info, record, param, wcet, &wcet);
-		LOAD_LONG(rtg_info, record, param, wcet, &period);
+		LOAD_LONG(rtg_info, record, param, period, &period);
 
 		ret = 1;
 		dprintf(3, "Read task_param record for task %d (%llu, %llu)\n",
@@ -433,6 +433,7 @@ int rt_graph_check_task_completion(struct graph_info *ginfo,
 	if (id == rtg_info->task_completion_id) {
 		LOAD_INT(rtg_info, record, completion, pid, pid);
 		LOAD_INT(rtg_info, record, completion, job, job);
+		*ts = get_rts(ginfo, record);
 
 		ret = 1;
 		dprintf(3, "Read task_completion (%d) record for job %d:%d "
@@ -618,7 +619,8 @@ int rt_graph_check_server_param(struct graph_info *ginfo, struct record *record,
  */
 int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 				    struct record *record,
-				    gint *sid, gint *job, gint *tid,
+				    gint *sid, gint *job,
+				    gint *tid, gint *tjob,
 				    unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -637,6 +639,7 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 		STORE_FIELD(rtg_info, event, sswitch_to, sid);
 		STORE_FIELD(rtg_info, event, sswitch_to, job);
 		STORE_FIELD(rtg_info, event, sswitch_to, tid);
+		STORE_FIELD(rtg_info, event, sswitch_to, tjob);
 	}
 
 	id = pevent_data_type(pevent, record);
@@ -644,9 +647,10 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 		LOAD_INT(rtg_info, record, sswitch_to, sid, sid);
 		LOAD_INT(rtg_info, record, sswitch_to, job, job);
 		LOAD_INT(rtg_info, record, sswitch_to, tid, tid);
+		LOAD_INT(rtg_info, record, sswitch_to, tjob, tjob);
 		*ts = get_rts(ginfo, record);
 
-		dprintf(3, "Read server_switch_to(job(%d, %d)): %d",
+		dprintf(3, "Read server_switch_to(job(%d, %d)): %d\n",
 			*sid, *job, *tid);
 		ret = 1;
 	}
@@ -660,7 +664,8 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
  */
 int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 				      struct record *record,
-				      gint *sid, gint *job, gint *tid,
+				      gint *sid, gint *job,
+				      gint *tid, gint *tjob,
 				      unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -679,6 +684,7 @@ int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 		STORE_FIELD(rtg_info, event, sswitch_away, sid);
 		STORE_FIELD(rtg_info, event, sswitch_away, job);
 		STORE_FIELD(rtg_info, event, sswitch_away, tid);
+		STORE_FIELD(rtg_info, event, sswitch_away, tjob);
 	}
 
 	id = pevent_data_type(pevent, record);
@@ -686,10 +692,11 @@ int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 		LOAD_INT(rtg_info, record, sswitch_away, sid, sid);
 		LOAD_INT(rtg_info, record, sswitch_away, job, job);
 		LOAD_INT(rtg_info, record, sswitch_away, tid, tid);
+		LOAD_INT(rtg_info, record, sswitch_away, tjob, tjob);
 		*ts = get_rts(ginfo, record);
 
 
-		dprintf(3, "Read server_switch_away(job(%d, %d)): %d",
+		dprintf(3, "Read server_switch_away(job(%d, %d)): %d\n",
 			*sid, *job, *tid);
 		ret = 1;
 	}
@@ -719,7 +726,7 @@ int rt_graph_check_server_release(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		rtg_info->server_release_id = event->id;
-		dprintf(2, "Found server_switch_away id %d\n", event->id);
+		dprintf(2, "Found server_release id %d\n", event->id);
 		STORE_FIELD(rtg_info, event, srelease, sid);
 		STORE_FIELD(rtg_info, event, srelease, job);
 		STORE_FIELD(rtg_info, event, srelease, release);
@@ -762,7 +769,7 @@ int rt_graph_check_server_completion(struct graph_info *ginfo,
 		if (!event)
 			goto out;
 		rtg_info->server_completion_id = event->id;
-		dprintf(2, "Found server_switch_away id %d\n", event->id);
+		dprintf(2, "Found server_completion id %d\n", event->id);
 		STORE_FIELD(rtg_info, event, scompletion, sid);
 		STORE_FIELD(rtg_info, event, scompletion, job);
 	}

@@ -19,6 +19,7 @@ static void update_tid(struct vcpu_info *info, int tid)
 	if (tid != info->run_tid) {
 		info->run_tid = tid;
 		snprintf(info->label, LLABEL, "%d", tid);
+		printf("Upated label to %s\n", info->label);
 	}
 }
 
@@ -26,16 +27,16 @@ static int
 try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		struct record *record, struct plot_info *info)
 {
-	int job, sid, tid, match, ret = 0;
+	int job, sid, tid, tjob, match, ret = 0;
 	unsigned long long ts;
 
 	match = rt_graph_check_server_switch_away(ginfo, record,
 						  &sid, &job,
-						  &tid, &ts);
+						  &tid, &tjob, &ts);
 	if (match && sid == vcpu_info->sid) {
 		update_tid(vcpu_info, tid);
 
-		if (vcpu_info->run_time < ts) {
+		if (vcpu_info->run_time && vcpu_info->run_time < ts) {
 			info->box = TRUE;
 			info->bcolor = hash_pid(tid);
 			info->bfill = vcpu_info->running;
@@ -48,7 +49,7 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 			tid, sid, job, ts);
 		vcpu_info->run_time = 0ULL;
 		vcpu_info->run_cpu = NO_CPU;
-		vcpu_info->run_tid = 0;
+		vcpu_info->run_tid = -1;
 		vcpu_info->running = FALSE;
 
 		ret = 1;
@@ -60,11 +61,11 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 				struct record *record, struct plot_info *info)
 {
-	int job, sid, tid,  match, ret = 0;
+	int job, sid, tid, tjob, match, ret = 0;
 	unsigned long long ts;
 
 	match = rt_graph_check_server_switch_to(ginfo, record,
-						&sid, &job, &tid, &ts);
+						&sid, &job, &tid, &tjob, &ts);
 	if (match && sid == vcpu_info->sid) {
 		update_tid(vcpu_info, tid);
 		vcpu_info->run_time = ts;
@@ -111,12 +112,14 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 	if (match && pid && pid == vcpu_info->run_tid && vcpu_info->running) {
 		vcpu_info->running = FALSE;
 
-		info->box = TRUE;
-		info->bcolor = hash_pid(pid);
-		info->bfill = TRUE;
-		info->bstart = vcpu_info->run_time;
-		info->bend = ts;
-		info->blabel = vcpu_info->label;
+		if (vcpu_info->run_time && vcpu_info->run_time < ts) {
+			info->box = TRUE;
+			info->bcolor = hash_pid(pid);
+			info->bfill = TRUE;
+			info->bstart = vcpu_info->run_time;
+			info->bend = ts;
+			info->blabel = vcpu_info->label;
+		}
 
 		vcpu_info->run_time = ts;
 		ret = 1;
@@ -127,7 +130,7 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 			struct plot_info *info)
 {
-	int tid, job, is_running;
+	int tid, job, tjob, is_running;
 	unsigned long long deadline, release;
 	struct record *record;
 
@@ -147,7 +150,7 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 					     vcpu_info->sid,
 					     ginfo->view_end_time,
 					     &release, &deadline,
-					     &job, &tid, &record);
+					     &job, &tid, &tjob, &record);
 		if (is_running) {
 			update_tid(vcpu_info, tid);
 			info->box = TRUE;
@@ -175,8 +178,8 @@ static int rt_vcpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		try_server_switch_to(ginfo, vcpu_info, record, info) ||
 		/* vcpu_try_block(ginfo, vcpu_info, record, info) || */
 		/* vcpu_try_resume(ginfo, vcpu_info, record, info) || */
-		vcpu_try_release(ginfo, vcpu_info, record, info) ||
-		vcpu_try_completion(ginfo, vcpu_info, record, info) ||
+		/* vcpu_try_release(ginfo, vcpu_info, record, info) || */
+		/* vcpu_try_completion(ginfo, vcpu_info, record, info) || */
 		try_switch_to(ginfo, vcpu_info, record, info) ||
 		try_switch_away(ginfo, vcpu_info, record, info);
 	return match;
@@ -199,6 +202,7 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 	struct graph_plot *plot;
 	struct vcpu_info  *vcpu;
 	char *label;
+	int len;
 
 	vcpu = malloc_or_die(sizeof(*vcpu));
 	vcpu->sid = vcpu_info->sid;
@@ -211,8 +215,19 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 
 	g_assert(cont);
 
-	label = malloc_or_die(1);
-	snprintf(label, 2, " ");
+
+	len = strlen(cont->name) + 100;
+	label = malloc_or_die(len);
+
+	if (vcpu_info->params.wcet)
+		snprintf(label, len, "%s - %d\nServer %d\n(%1.1f, %1.1f)",
+			 cont->name, cont->cid, vcpu_info->sid,
+			 nano_as_milli(vcpu_info->params.wcet),
+			 nano_as_milli(vcpu_info->params.period));
+	else
+		snprintf(label, len, "%s - %d\nServer %d",
+			 cont->name, cont->cid, vcpu_info->sid);
+
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_SERVER_CPU,
 				       TIME_TYPE_RT, &rt_vcpu_cb, vcpu);
 	trace_graph_plot_add_all_recs(ginfo, plot);
@@ -231,15 +246,14 @@ void rt_vcpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 	vcpu_info->run_time = time;
 	vcpu_info->block_time = time;
 	vcpu_info->run_cpu = NO_CPU;
-	vcpu_info->run_tid = 0;
+	vcpu_info->run_tid = -1;
 	vcpu_info->block_cpu = NO_CPU;
 	vcpu_info->fresh = FALSE;
 
 	vcpu_info->fresh = TRUE;
 	vcpu_info->running = FALSE;
 	vcpu_info->last_job = -1;
-
-	vcpu_info->run_tid = 0;
+	update_tid(vcpu_info, 0);
 }
 
 /**
@@ -265,10 +279,10 @@ int rt_vcpu_plot_record_matches(struct rt_plot_common *rt,
 	unsigned long long dull;
 
 #define ARG ginfo, record, &sid
-	match = rt_graph_check_server_switch_to(ARG, &dint, &dint, &dull)   ||
-		rt_graph_check_server_switch_away(ARG, &dint, &dint, &dull) ||
-		rt_graph_check_server_completion(ARG, &dint, &dull)  ||
-		rt_graph_check_server_release(ARG, &dint, &dull, &dull);
+	match = rt_graph_check_server_switch_to(ARG, &dint, &dint, &dint, &dull)   ||
+		rt_graph_check_server_switch_away(ARG, &dint, &dint, &dint, &dull);
+		/* rt_graph_check_server_completion(ARG, &dint, &dull)  || */
+		/* rt_graph_check_server_release(ARG, &dint, &dull, &dull); */
 		/* rt_graph_check_server_block(ARG, &dull)		    || */
 		/* rt_graph_check_server_resume(ARG, &dull); */
 #undef ARG
@@ -300,19 +314,19 @@ rt_vcpu_plot_write_header(struct rt_plot_common *rt,
 			  struct trace_seq *s,
 			  unsigned long long time)
 {
-	int is_running, job, tid;
+	int is_running, job, tid, tjob;
 	unsigned long long release, deadline;
 	struct vcpu_info *vcpu_info = (struct vcpu_info*)rt;
 	struct record *record;
 
 	is_running = get_server_info(ginfo, rt, vcpu_info->sid, time,
-				   &release, &deadline,
-				   &job, &tid, &record);
+				     &release, &deadline,
+				     &job, &tid, &tjob, &record);
 
-	trace_seq_printf(s, "%s-%d\n%d", vcpu_info->cont->name,
+	trace_seq_printf(s, "%s\nServer: %d:%d\n", vcpu_info->cont->name,
 			 vcpu_info->sid, job);
 	if (is_running) {
-		trace_seq_printf(s, " - %d", tid);
+		trace_seq_printf(s, "Running:  %d:%d", tid, tjob);
 	}
 	trace_seq_putc(s, '\n');
 	return record;

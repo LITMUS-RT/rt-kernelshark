@@ -55,7 +55,7 @@
 #define PLOT_GIVE	2
 #define PLOT_BEGIN	80
 #define PLOT_SEP	50
-#define MAX_TRI_TIME    1000000
+#define MAX_TRI_TIME    10000000
 #define PLOT_LINE(plot) (PLOT_SEP * (plot) + PLOT_BEGIN + PLOT_SIZE)
 #define PLOT_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE * 2)
 #define PLOT_BOX_TOP(plot) (PLOT_LINE(plot) - PLOT_SIZE)

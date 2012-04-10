@@ -17,6 +17,6 @@ int get_server_info(struct graph_info *ginfo,
 		    struct rt_plot_common *rt,
 		    int match_sid, unsigned long long time,
 		    unsigned long long *release, unsigned long long *deadline,
-		    int *job, int *tid, struct record **record);
+		    int *job, int *tid, int *tjob, struct record **record);
 
 #endif

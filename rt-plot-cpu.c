@@ -57,10 +57,6 @@ is_displayed(struct graph_info *ginfo, int eid)
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	return (eid == rtg_info->switch_away_id     ||
 		eid == rtg_info->switch_to_id       ||
-		eid == rtg_info->task_completion_id ||
-		eid == rtg_info->task_block_id      ||
-		eid == rtg_info->task_resume_id     ||
-		eid == rtg_info->task_release_id    ||
 		eid == ginfo->event_sched_switch_id);
 }
 

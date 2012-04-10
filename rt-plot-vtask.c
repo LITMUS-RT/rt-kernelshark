@@ -32,18 +32,18 @@ static int
 try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		struct record *record, struct plot_info *info)
 {
-	int job, sid, tid, match, ret = 0;
+	int job, sid, tid, tjob, match, ret = 0;
 	unsigned long long ts;
 
 	match = rt_graph_check_server_switch_away(ginfo, record,
 						  &sid, &job,
-						  &tid, &ts);
-	if (match && sid == vcpu_info->sid) {
-		/* update_job(vcpu_info, job); */
+						  &tid, &tjob, &ts);
+	if (match && tid == vcpu_info->sid) {
+		update_job(vcpu_info, tjob);
 
-		if (vcpu_info->run_time < ts) {
+		if (vcpu_info->run_time && vcpu_info->run_time < ts) {
 			info->box = TRUE;
-			info->bcolor = hash_pid(sid);
+			info->bcolor = hash_cpu(sid - 1);
 			info->bfill = TRUE;
 			info->bstart = vcpu_info->run_time;
 			info->bend = ts;
@@ -65,13 +65,13 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 				struct record *record, struct plot_info *info)
 {
-	int job, sid, tid,  match, ret = 0;
+	int job, sid, tid, tjob, match, ret = 0;
 	unsigned long long ts;
 
 	match = rt_graph_check_server_switch_to(ginfo, record,
-						&sid, &job, &tid, &ts);
-	if (match && sid == vcpu_info->sid) {
-		update_job(vcpu_info, job);
+						&sid, &job, &tid, &tjob, &ts);
+	if (match && tid == vcpu_info->sid) {
+		update_job(vcpu_info, tjob);
 		vcpu_info->run_time = ts;
 		vcpu_info->run_cpu = record->cpu;
 		vcpu_info->run_tid = tid;
@@ -82,40 +82,40 @@ static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu
 	return ret;
 }
 
-static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
-			 struct record *record, struct plot_info *info)
-{
-	int job, pid, match, ret = 0;
-	unsigned long long ts;
+/* static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info, */
+/* 			 struct record *record, struct plot_info *info) */
+/* { */
+/* 	int job, pid, match, ret = 0; */
+/* 	unsigned long long ts; */
 
-	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts);
-	if (match && pid && pid == vcpu_info->run_tid && vcpu_info->run_time) {
-		info->line = TRUE;
-		info->lcolor = hash_pid(pid);
-		ret = 1;
-	}
-	return ret;
-}
+/* 	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts); */
+/* 	if (match && pid && pid == vcpu_info->run_tid && vcpu_info->run_time) { */
+/* 		info->line = TRUE; */
+/* 		info->lcolor = hash_pid(pid); */
+/* 		ret = 1; */
+/* 	} */
+/* 	return ret; */
+/* } */
 
-static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
-			   struct record *record, struct plot_info *info)
-{
-	int job, pid, match, ret = 0;
-	unsigned long long ts;
+/* static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info, */
+/* 			   struct record *record, struct plot_info *info) */
+/* { */
+/* 	int job, pid, match, ret = 0; */
+/* 	unsigned long long ts; */
 
-	match = rt_graph_check_switch_away(ginfo, record, &pid, &job, &ts);
-	if (match && pid && pid == vcpu_info->run_tid) {
-		info->line = TRUE;
-		info->lcolor = hash_pid(pid);
-		ret = 1;
-	}
-	return ret;
-}
+/* 	match = rt_graph_check_switch_away(ginfo, record, &pid, &job, &ts); */
+/* 	if (match && pid && pid == vcpu_info->run_tid) { */
+/* 		info->line = TRUE; */
+/* 		info->lcolor = hash_pid(pid); */
+/* 		ret = 1; */
+/* 	} */
+/* 	return ret; */
+/* } */
 
 static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 			struct plot_info *info)
 {
-	int tid, job, is_running;
+	int tid, job, is_running, tjob;
 	unsigned long long deadline, release;
 	struct record *record;
 
@@ -135,7 +135,7 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 					     vcpu_info->sid,
 					     ginfo->view_end_time,
 					     &release, &deadline,
-					     &job, &tid, &record);
+					     &job, &tid, &tjob, &record);
 		if (is_running) {
 			update_job(vcpu_info, job);
 			info->box = TRUE;
@@ -164,9 +164,9 @@ static int rt_vtask_plot_event(struct graph_info *ginfo, struct graph_plot *plot
 		/* vcpu_try_block(ginfo, vcpu_info, record, info) || */
 		/* vcpu_try_resume(ginfo, vcpu_info, record, info) || */
 		vcpu_try_release(ginfo, vcpu_info, record, info) ||
-		vcpu_try_completion(ginfo, vcpu_info, record, info) ||
-		try_switch_to(ginfo, vcpu_info, record, info) ||
-		try_switch_away(ginfo, vcpu_info, record, info);
+		vcpu_try_completion(ginfo, vcpu_info, record, info);
+		/* try_switch_to(ginfo, vcpu_info, record, info) || */
+		/* try_switch_away(ginfo, vcpu_info, record, info); */
 	return match;
 }
 
@@ -186,7 +186,6 @@ void insert_vtask(struct graph_info *ginfo, struct cont_list *cont,
 	struct graph_plot *plot;
 	struct vcpu_info *vtask;
 	char *label;
-	int len;
 
 	vtask = malloc_or_die(sizeof(*vtask));
 	vtask->sid = vcpu_info->sid;
@@ -197,13 +196,8 @@ void insert_vtask(struct graph_info *ginfo, struct cont_list *cont,
 	vtask->common.is_drawn = rt_vcpu_plot_is_drawn;
 	vtask->common.write_header = rt_vcpu_plot_write_header;
 
-
-	len = strlen(cont->name) + 100;
-	label = malloc_or_die(len);
-	snprintf(label, len, "%s - %d\n(%1.1f, %1.1f)",
-		 cont->name, -vtask->sid,
-		 nano_as_milli(vcpu_info->params.wcet),
-		 nano_as_milli(vcpu_info->params.period));
+	label = malloc_or_die(1);
+	snprintf(label, 2, " ");
 
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_SERVER_TASK,
 				       TIME_TYPE_RT, &rt_vtask_cb, vtask);

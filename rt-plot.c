@@ -287,8 +287,9 @@ set_cpu_to_rts(struct graph_info *ginfo, unsigned long long rt_target, int cpu)
 		 */
 		do {
 			seek_time = seek_time - 1.5 * (rts - rt_target);
+			last_rts = rts;
 			rts = next_rts(ginfo, cpu, seek_time);
-		} while (rts > rt_target);
+		} while (rts > rt_target && rts != last_rts);
 	}
 
 	/* Get to first record at or after time */
@@ -368,11 +369,11 @@ int is_task_running(struct graph_info *ginfo,
  * Returns release record and @out_job, @out_release, and @out_deadline if a
  * release was found for @tid before @time.
  */
-struct record* get_previous_release(struct graph_info *ginfo, int match_tid,
-				    unsigned long long time,
-				    int *out_job,
-				    unsigned long long *out_release,
-				    unsigned long long *out_deadline)
+void get_previous_release(struct graph_info *ginfo, int match_tid,
+			  unsigned long long time,
+			  int *out_job,
+			  unsigned long long *out_release,
+			  unsigned long long *out_deadline)
 {
 	int tid, cpu, match, job;
 	unsigned long long release, deadline, min_ts;
@@ -424,5 +425,5 @@ struct record* get_previous_release(struct graph_info *ginfo, int match_tid,
 	loop_end:
 		free_record(last_rec);
 	}
-	return ret;
+	free_record(ret);
 }
