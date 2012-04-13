@@ -19,7 +19,6 @@ static void update_tid(struct vcpu_info *info, int tid)
 	if (tid != info->run_tid) {
 		info->run_tid = tid;
 		snprintf(info->label, LLABEL, "%d", tid);
-		printf("Upated label to %s\n", info->label);
 	}
 }
 
@@ -227,7 +226,6 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 	else
 		snprintf(label, len, "%s - %d\nServer %d",
 			 cont->name, cont->cid, vcpu_info->sid);
-
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_SERVER_CPU,
 				       TIME_TYPE_RT, &rt_vcpu_cb, vcpu);
 	trace_graph_plot_add_all_recs(ginfo, plot);
@@ -325,9 +323,23 @@ rt_vcpu_plot_write_header(struct rt_plot_common *rt,
 
 	trace_seq_printf(s, "%s\nServer: %d:%d\n", vcpu_info->cont->name,
 			 vcpu_info->sid, job);
+
 	if (is_running) {
 		trace_seq_printf(s, "Running:  %d:%d", tid, tjob);
 	}
+
+	if (in_res(ginfo, deadline, time)) {
+		trace_seq_printf(s, "\nlitmus_server_deadline\n"
+				 "deadline(job(%d,%d)): %llu\n",
+				 vcpu_info->sid, job, deadline);
+	}
+	if (in_res(ginfo, release, time)) {
+		trace_seq_printf(s, "\nlitmus_server_release\n"
+				 "release(job(%d,%d)): %llu\n",
+				 vcpu_info->sid, job, release);
+	}
+
+
 	trace_seq_putc(s, '\n');
 	return record;
 }

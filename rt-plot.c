@@ -123,7 +123,7 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 {
 	struct rt_plot_common *rt_info = plot->private;
 	struct event_format *event;
-	struct record *record, *prev_record, *data_record;
+	struct record *record = NULL, *prev_record = NULL, *data_record = NULL;
 	unsigned long long msec, nsec, rts, ptime, rtime, range;
 	long long pdiff, rdiff;
 	int eid;
@@ -395,8 +395,9 @@ void get_previous_release(struct graph_info *ginfo, int match_tid,
 		last_rec->ref_count++;
 
 		while ((rec = tracecmd_read_prev(ginfo->handle, last_rec))) {
-			if (rec->ts < min_ts) {
+			if (get_rts(ginfo, rec) < min_ts) {
 				free_record(rec);
+
 				goto loop_end;
 			}
 
@@ -425,5 +426,6 @@ void get_previous_release(struct graph_info *ginfo, int match_tid,
 	loop_end:
 		free_record(last_rec);
 	}
+
 	free_record(ret);
 }
