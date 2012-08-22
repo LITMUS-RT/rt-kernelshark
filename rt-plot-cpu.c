@@ -513,8 +513,11 @@ void rt_plot_cpus_update_callback(gboolean accept,
 			if (plot->type != PLOT_TYPE_CPU)
 				continue;
 			rtc_info = plot->private;
-			if (!cpu_isset(selected_cpu_mask, rtc_info->cpu))
+			if (!cpu_isset(selected_cpu_mask, rtc_info->cpu)) {
 				trace_graph_plot_remove(ginfo, plot);
+				trace_graph_plot_remove_cpu(ginfo, plot,
+							    rtc_info->cpu);
+			}
 		}
 	}
 
@@ -573,6 +576,8 @@ void rt_plot_cpu_label(struct graph_info *ginfo, int cpu, char* label)
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_RT_CPU,
 				       TIME_TYPE_RT, &rt_cpu_cb, rtc_info);
 	trace_graph_plot_add_all_recs(ginfo, plot);
+
+	trace_graph_plot_add_cpu(ginfo, plot, cpu);
 }
 
 /**

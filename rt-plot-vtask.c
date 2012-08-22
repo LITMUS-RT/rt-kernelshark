@@ -16,10 +16,6 @@
 static void update_job(struct vcpu_info *info, int job)
 {
 	info->fresh = FALSE;
-	if (job < info->last_job) {
-		dprintf(1, "Inconsistent job state for server %d:%d -> %d\n",
-		       info->sid, info->last_job, job);
-	}
 
 	if (job > info->last_job) {
 		info->last_job = job;

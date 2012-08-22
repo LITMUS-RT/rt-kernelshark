@@ -1859,7 +1859,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
-static void draw_ft_plots(struct graph_info *ginfo)
+static void draw_hashed_plots(struct graph_info *ginfo)
 {
 	gint cpu, pid;
 	struct record *record;
@@ -1881,8 +1881,8 @@ static void draw_ft_plots(struct graph_info *ginfo)
 		hash = trace_graph_plot_find_cpu(ginfo, cpu);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				if (list->plot->time != TIME_TYPE_FT)
-					continue;
+				/* if (list->plot->time != TIME_TYPE_FT) */
+				/* 	continue; */
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
@@ -1890,44 +1890,52 @@ static void draw_ft_plots(struct graph_info *ginfo)
 		hash = trace_graph_plot_find_task(ginfo, pid);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				if (list->plot->time != TIME_TYPE_FT)
-					continue;
+				/* if (list->plot->time != TIME_TYPE_FT) */
+				/* 	continue; */
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
 		for (list = ginfo->all_recs; list; list = list->next) {
-			if (list->plot->time != TIME_TYPE_FT)
-				continue;
-			draw_plot(ginfo, list->plot, record);
+			/* if (list->plot->time != TIME_TYPE_FT) */
+			/* 	continue; */
+			// TODO: hacky assumption that everything else can be
+			// reached via previous hashes
+			// Should be an additional hashed list where things are
+			// added with arbitrary numbers, and a pevent_other_id
+			// which uses id ranges x < . < y to parse cids or lids
+			if (list->plot->type == PLOT_TYPE_SERVER_TASK ||
+			    list->plot->type == PLOT_TYPE_SERVER_CPU) {
+				draw_plot(ginfo, list->plot, record);
+			}
 		}
 		free_record(record);
 	}
 }
 
-static void draw_rt_plots(struct graph_info *ginfo)
-{
-	gint cpu;
-	struct record *record;
-	struct plot_list *list;
+/* static void draw_rt_plots(struct graph_info *ginfo) */
+/* { */
+/* 	gint cpu; */
+/* 	struct record *record; */
+/* 	struct plot_list *list; */
 
-	set_cpus_to_rts(ginfo, ginfo->view_start_time);
-	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
-		if (get_rts(ginfo, record) < ginfo->view_start_time) {
-			free_record(record);
-			continue;
-		}
-		if (get_rts(ginfo, record) > ginfo->view_end_time) {
-			free_record(record);
-			break;
-		}
-		for (list = ginfo->all_recs; list; list = list->next) {
-			if (list->plot->time != TIME_TYPE_RT)
-				continue;
-			draw_plot(ginfo, list->plot, record);
-		}
-		free_record(record);
-	}
-}
+/* 	set_cpus_to_rts(ginfo, ginfo->view_start_time); */
+/* 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) { */
+/* 		if (get_rts(ginfo, record) < ginfo->view_start_time) { */
+/* 			free_record(record); */
+/* 			continue; */
+/* 		} */
+/* 		if (get_rts(ginfo, record) > ginfo->view_end_time) { */
+/* 			free_record(record); */
+/* 			break; */
+/* 		} */
+/* 		for (list = ginfo->all_recs; list; list = list->next) { */
+/* 			if (list->plot->time != TIME_TYPE_RT) */
+/* 				continue; */
+/* 			draw_plot(ginfo, list->plot, record); */
+/* 		} */
+/* 		free_record(record); */
+/* 	} */
+/* } */
 
 static void draw_plots(struct graph_info *ginfo, gint new_width)
 {
@@ -1984,8 +1992,7 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		goto out;
 	}
 
-	draw_ft_plots(ginfo);
-	draw_rt_plots(ginfo);
+	draw_hashed_plots(ginfo);
 
 out:
 	for (i = 0; i < ginfo->plots; i++) {
@@ -2324,6 +2331,8 @@ static void redraw_pixmap_backend(struct graph_info *ginfo)
 	}
 }
 
+static int tries = 0;
+
 static gboolean
 configure_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 {
@@ -2331,7 +2340,10 @@ configure_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 
 	gtk_widget_set_size_request(widget, ginfo->draw_width, ginfo->draw_height);
 
-	redraw_pixmap_backend(ginfo);
+	// TODO: don't do this, compare widget to figure out if we should redraw
+	if (tries != 1 && tries != 2)
+		redraw_pixmap_backend(ginfo);
+	++tries;
 
 	/* debug */
 	ginfo->hadj_value = gtk_adjustment_get_value(ginfo->hadj);

@@ -63,11 +63,7 @@ next_box_record(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 static int update_job(struct rt_task_info *rtt_info, int job)
 {
 	rtt_info->fresh = FALSE;
-	if (job < rtt_info->last_job) {
-		printf("Inconsistent job state for %d:%d -> %d\n",
-		    rtt_info->pid, rtt_info->last_job, job);
-		return 0;
-	} else if (job > rtt_info->last_job) {
+	if (job > rtt_info->last_job) {
 		rtt_info->last_job = job;
 		snprintf(rtt_info->label, LLABEL, "%d:%d",
 			 rtt_info->pid, rtt_info->last_job);
@@ -237,7 +233,7 @@ static int try_block(struct graph_info *ginfo, struct rt_task_info *rtt_info,
 		dprintf(3, "Block for %d on %d at %llu\n",
 			pid, record->cpu, ts);
 		ret = 1;
-	} 
+	}
 	return ret;
 }
 
@@ -585,6 +581,7 @@ void rt_plot_task_update_callback(gboolean accept,
 		}
 		/* Remove the plot */
 		trace_graph_plot_remove(ginfo, plot);
+		trace_graph_plot_remove_task(ginfo, plot, rtt_info->pid);
 	}
 
 	/* Now add any plots that need to be added */
@@ -662,6 +659,8 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 				       &rt_task_cb, rtt_info);
 	free(plot_label);
 	trace_graph_plot_add_all_recs(ginfo, plot);
+
+	trace_graph_plot_add_task(ginfo, plot, pid);
 }
 
 void rt_plot_add_all_tasks(struct graph_info *ginfo)
