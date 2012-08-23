@@ -1859,30 +1859,57 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
+
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
 	gint cpu, pid;
+	gboolean started;
 	struct record *record;
 	struct plot_hash *hash;
 	struct plot_list *list;
 
+	set_cpus_to_rts(ginfo, ginfo->view_start_time);
 
-	tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
-					   ginfo->view_start_time);
 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
-		if (record->ts < ginfo->view_start_time) {
+		if (get_rts(ginfo, record) < ginfo->view_start_time) {
 			free_record(record);
 			continue;
 		}
-		if (record->ts > ginfo->view_end_time) {
+		if (get_rts(ginfo, record) > ginfo->view_end_time) {
 			free_record(record);
 			break;
 		}
+
+		// TODO: hack to clean up until first release, make unhacky
+		if (ginfo->rtg_info.clean_records &&
+		    ginfo->rtg_info.start_time == 0) {
+			unsigned long long dull, rel = 0;
+			char *dchar;
+			int dint;
+
+			// These methods add to the lists of tasks / containers
+			// in the system whenever a new param record is found.
+			// Skipping these records would be very bad, so parse
+			// them here if we are cleaning. Otherwise, draw_plot
+			// will take care of this
+#define ARG ginfo,record, &pid
+			rt_graph_check_task_param(ARG, &dull, &dull);
+			rt_graph_check_container_param(ARG, &dchar);
+			rt_graph_check_server_param(ARG, &dint, &dull, &dull);
+#undef ARG
+			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
+				dull = rel - .1 * (ginfo->view_end_time - rel);;
+				ginfo->rtg_info.start_time = dull;
+				ginfo->view_start_time = dull;
+			}
+
+			free_record(record);
+			continue;
+		}
+
 		hash = trace_graph_plot_find_cpu(ginfo, cpu);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				/* if (list->plot->time != TIME_TYPE_FT) */
-				/* 	continue; */
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
@@ -1890,14 +1917,10 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 		hash = trace_graph_plot_find_task(ginfo, pid);
 		if (hash) {
 			for (list = hash->plots; list; list = list->next) {
-				/* if (list->plot->time != TIME_TYPE_FT) */
-				/* 	continue; */
 				draw_plot(ginfo, list->plot, record);
 			}
 		}
 		for (list = ginfo->all_recs; list; list = list->next) {
-			/* if (list->plot->time != TIME_TYPE_FT) */
-			/* 	continue; */
 			// TODO: hacky assumption that everything else can be
 			// reached via previous hashes
 			// Should be an additional hashed list where things are
@@ -1912,30 +1935,6 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 	}
 }
 
-/* static void draw_rt_plots(struct graph_info *ginfo) */
-/* { */
-/* 	gint cpu; */
-/* 	struct record *record; */
-/* 	struct plot_list *list; */
-
-/* 	set_cpus_to_rts(ginfo, ginfo->view_start_time); */
-/* 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) { */
-/* 		if (get_rts(ginfo, record) < ginfo->view_start_time) { */
-/* 			free_record(record); */
-/* 			continue; */
-/* 		} */
-/* 		if (get_rts(ginfo, record) > ginfo->view_end_time) { */
-/* 			free_record(record); */
-/* 			break; */
-/* 		} */
-/* 		for (list = ginfo->all_recs; list; list = list->next) { */
-/* 			if (list->plot->time != TIME_TYPE_RT) */
-/* 				continue; */
-/* 			draw_plot(ginfo, list->plot, record); */
-/* 		} */
-/* 		free_record(record); */
-/* 	} */
-/* } */
 
 static void draw_plots(struct graph_info *ginfo, gint new_width)
 {
@@ -2341,7 +2340,7 @@ configure_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 	gtk_widget_set_size_request(widget, ginfo->draw_width, ginfo->draw_height);
 
 	// TODO: don't do this, compare widget to figure out if we should redraw
-	if (tries != 1 && tries != 2)
+	if (tries != 2)
 		redraw_pixmap_backend(ginfo);
 	++tries;
 

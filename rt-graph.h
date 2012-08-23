@@ -21,6 +21,9 @@ struct ts_list;
 struct vcpu_list;
 
 struct rt_graph_info {
+	/* For ignoring records before system release */
+	gboolean		clean_records;
+	long long 		start_time;
 
 	/* List of all real-time tasks */
 	struct task_list 	*tasks[TASK_HASH_SIZE];
@@ -62,6 +65,9 @@ struct rt_graph_info {
 	struct format_field 	*resume_pid_field;
 	struct format_field 	*resume_lid_field;
 
+	gint			sys_release_id;
+	struct format_field	*sys_release_rel_field;
+
 	gint			container_param_id;
 	struct format_field	*cparam_cid_field;
 	struct format_field	*cparam_name_field;
@@ -101,7 +107,6 @@ struct rt_graph_info {
 	gint 			server_resume_id;
 	struct format_field 	*sresume_sid_field;
 	struct format_field 	*sresume_lid_field;
-
 
 	/* Cache of ts fields for non-litmus events */
 	struct ts_list		*events[TS_HASH_SIZE];
@@ -202,6 +207,8 @@ int rt_graph_check_server_block(struct graph_info *ginfo,
 				unsigned long long *when);
 int rt_graph_check_server_resume(struct graph_info *ginfo, struct record *record,
 				 gint *pid, gint *lid, unsigned long long *when);
+int rt_graph_check_sys_release(struct graph_info *ginfo, struct record *record,
+			       unsigned long long *when);
 void init_rt_event_cache(struct rt_graph_info *rtinfo);
 
 unsigned long long get_rts(struct graph_info *ginfo,

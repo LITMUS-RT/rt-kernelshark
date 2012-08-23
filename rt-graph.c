@@ -523,6 +523,43 @@ int rt_graph_check_task_resume(struct graph_info *ginfo,
 	return ret;
 }
 
+
+/**
+ * rt_graph_check_sys_release - check for system release record
+ * Return 1 and @when if the record matches
+ */
+int rt_graph_check_sys_release(struct graph_info *ginfo,
+			       struct record *record,
+			       unsigned long long *rel)
+{
+	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
+	struct pevent *pevent = ginfo->pevent;
+	struct event_format *event;
+	gint id;
+	int ret = 0;
+
+	if (rtg_info->sys_release_id < 0) {
+		event = pevent_find_event_by_name(pevent, "litmus",
+						  "litmus_sys_release");
+		if (!event)
+			goto out;
+		rtg_info->sys_release_id = event->id;
+		dprintf(2, "Found sys_release id %d\n", event->id);
+		STORE_FIELD(rtg_info, event, sys_release, rel);
+	}
+
+	id = pevent_data_type(pevent, record);
+	if (id == rtg_info->sys_release_id) {
+		LOAD_LONG(rtg_info, record, sys_release, rel, rel);
+
+		ret = 1;
+		dprintf(3, "Read sys_release (%d) record, rel: %llu\n", id, *rel);
+	}
+ out:
+	return ret;
+}
+
+
 /**
  * rt_graph_check_container_param - check for litmus_container_param record
  * Return 1, @cid, and @name if the record matches
@@ -876,6 +913,9 @@ void init_rt_event_cache(struct rt_graph_info *rtg_info)
 
 	memset(rtg_info, 0, sizeof(*rtg_info));
 
+	rtg_info->clean_records = 0;
+	rtg_info->start_time = 0ULL;
+
 	rtg_info->task_param_id = -1;
 	rtg_info->switch_to_id = -1;
 	rtg_info->switch_away_id = -1;
@@ -884,7 +924,9 @@ void init_rt_event_cache(struct rt_graph_info *rtg_info)
 	rtg_info->task_block_id = -1;
 	rtg_info->task_resume_id = -1;
 
+	rtg_info->sys_release_id = -1;
 	rtg_info->container_param_id = -1;
+
 	rtg_info->server_param_id = -1;
 	rtg_info->server_switch_to_id = -1;
 	rtg_info->server_switch_away_id = -1;

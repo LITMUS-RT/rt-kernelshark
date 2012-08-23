@@ -65,6 +65,7 @@ void usage(char *prog)
 	printf("  -h	Display this help message\n");
 	printf("  -v	Display version and exit\n");
 	printf("  -i	input_file, default is %s\n", default_input_file);
+	printf("  -c	Ignore records before system release\n");
 }
 
 static gboolean display_warnings;
@@ -1826,13 +1827,15 @@ void kernel_shark(int argc, char **argv)
 	GtkWidget *statusbar;
 	int ret;
 	int c;
+	int clean;
 
 	g_thread_init(NULL);
 	gdk_threads_init();
 
 	gtk_init(&argc, &argv);
 
-	while ((c = getopt(argc, argv, "hvi:")) != -1) {
+	clean = 0;
+	while ((c = getopt(argc, argv, "hcvi:")) != -1) {
 		switch(c) {
 		case 'h':
 			usage(basename(argv[0]));
@@ -1845,6 +1848,8 @@ void kernel_shark(int argc, char **argv)
 		case 'i':
 			input_file = optarg;
 			break;
+		case 'c':
+			clean = 1;
 		default:
 			/* assume the other options are for gtk */
 			break;
@@ -2396,6 +2401,7 @@ void kernel_shark(int argc, char **argv)
 	info->graph_cbs.filter = ks_graph_filter;
 
 	info->ginfo = trace_graph_create_with_callbacks(handle, &info->graph_cbs);
+	info->ginfo->rtg_info.clean_records = clean;
 	widget = trace_graph_get_window(info->ginfo);
 	gtk_paned_add1(GTK_PANED(vpaned), widget);
 	gtk_widget_show(widget);
