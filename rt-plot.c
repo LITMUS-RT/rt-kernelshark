@@ -1,5 +1,170 @@
 #include <gtk/gtk.h>
+#include <string.h>
 #include "trace-graph.h"
+#include "list.h"
+
+
+struct record_list {
+	struct record_list *next;
+	struct record *record;
+};
+
+/*
+ * Insert @record into @list, storing the record in @node.
+ */
+void insert_record(struct graph_info *ginfo, struct record_list *list,
+		   struct record *record, struct record_list *node,
+		   int reverse)
+{
+	if (node->next)
+		die("Node is in use!");
+	if (!record) {
+		printf("No record\n");
+		return;
+	}
+
+	node->record = record;
+
+	struct record_list *pos = list;
+
+	while (pos->next) {
+		unsigned long long next_rts = get_rts(ginfo, pos->next->record);
+		if (( reverse && !next_rts > get_rts(ginfo, record)) ||
+		    (!reverse &&  next_rts < get_rts(ginfo, record))){
+			break;
+		}
+		pos = pos->next;
+	}
+
+	node->next = pos->next;
+	pos->next = node;	
+}
+
+
+/*
+ * Remove the first record in @list and put into @node.
+ */
+int pop_record(struct graph_info *ginfo, struct record_list *list,
+	       struct record_list **node)
+{
+	if (!list->next)
+		return 0;
+
+	*node = list->next;
+	list->next = list->next->next;
+	(*node)->next = 0;
+
+	return 1;	
+}
+
+
+/* For communication between get_previous_release and its iterator */
+struct prev_release_args {
+	unsigned long long min_ts;
+	struct rt_plot_common *common;
+	unsigned long long time;
+	int match_tid;
+	unsigned int *out_job;
+	unsigned long long *out_release;
+	unsigned long long *out_deadline;
+};
+
+
+static int
+prev_release_iterator(struct graph_info *ginfo, struct record *rec, void *data)
+{
+	int tid, is_release, job;
+	unsigned long long release, deadline;
+	struct prev_release_args *args = data;
+
+	if (get_rts(ginfo, rec) < args->min_ts) {
+		args->common->last_job.release = get_rts(ginfo, rec);
+		args->common->last_job.deadline = args->time;
+		return 0;
+	}
+
+#define ARG ginfo, rec, &tid, &job, &release, &deadline
+	is_release = rt_graph_check_task_release(ARG) ||
+		     rt_graph_check_server_release(ARG);
+#undef ARG
+
+	if (is_release && args->match_tid == tid && release <= args->time) {
+		*(args->out_job) = job;
+		*(args->out_release) = release;
+		*(args->out_deadline) = deadline;
+		
+		/* Cache to minimize work later */
+		args->common->last_job.no = job;
+		args->common->last_job.release = release;
+		args->common->last_job.deadline = deadline;
+		args->common->last_job.start = get_rts(ginfo, rec);
+		args->common->last_job.end = args->time;
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+
+/* For communication between find_prev_display_record and its iterator */
+struct prev_display_args {
+	struct rt_plot_common *common;
+	struct record *result;
+	unsigned long long min_ts;
+};
+
+
+static int
+prev_display_iterator(struct graph_info *ginfo, struct record *record, void *data)
+{
+	int eid, ignored;
+	struct prev_display_args *args = data;
+
+	if (get_rts(ginfo, record) < args->min_ts) {
+		return 0;
+	}
+		
+	eid = pevent_data_type(ginfo->pevent, record);
+	ignored = (eid == ginfo->event_sched_switch_id);
+
+	if (!ignored) {
+		ignored = args->common->is_drawn(ginfo, eid);
+	}
+	
+	if (!ignored && args->common->record_matches(args->common, ginfo, record)) {
+		args->result = record;
+		++record->ref_count;
+		printf("success!\n");
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+
+/*
+ * Return first displayed record before @time, abandoning search after @range.
+ */
+static struct record*
+find_prev_display_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
+		 unsigned long long time, unsigned long long range)
+{
+	int eid, ignored, match, cpu;
+	struct record *prev, *next, *res = NULL;
+	struct prev_display_args args = {rt_info, NULL, 0};
+
+	if (range) {
+		args.min_ts = time - range;
+	} else {
+		args.min_ts = time - max_rt_search(ginfo);
+	}
+
+	set_cpus_to_rts(ginfo, time);
+	iterate(ginfo, 1, prev_display_iterator, &args);
+
+	return args.result;
+}
+
 
 /**
  * Return first relevant record after @time.
@@ -10,7 +175,7 @@ __find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
 		 guint64 time, int display, unsigned long long range)
 {
 	int next_cpu, match, eid, ignored;
-	struct record *record;
+	struct record *record = NULL;
 
 	set_cpus_to_rts(ginfo, time);
 	while ((record = tracecmd_read_next_data(ginfo->handle, &next_cpu))) {
@@ -71,49 +236,6 @@ rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
 	return 1;
 }
 
-/*
- * Return first displayed record before @time, abandoning search after @range.
- */
-static struct record*
-find_prev_display_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
-		 unsigned long long time, unsigned long long range)
-{
-	int eid, ignored, match, cpu;
-	struct record *prev, *res = NULL;
-	unsigned long long min_ts;
-
-	if (range)
-		min_ts = time - range;
-	else
-		min_ts = time - max_rt_search(ginfo);
-
-	set_cpus_to_rts(ginfo, time);
-
-	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
-		prev = tracecmd_peek_data(ginfo->handle, cpu);
-		while ((prev = tracecmd_read_prev(ginfo->handle, prev)) &&
-		       get_rts(ginfo, prev) > min_ts) {
-			eid = pevent_data_type(ginfo->pevent, prev);
-			ignored = (eid == ginfo->event_sched_switch_id);
-			if (!ignored) {
-				ignored = rt_info->is_drawn(ginfo, eid);
-			}
-			match = !ignored &&
-				rt_info->record_matches(rt_info, ginfo, prev);
-			if (match) {
-				if (!res ||
-				    get_rts(ginfo, prev) > get_rts(ginfo, res)) {
-					free_record(res);
-					res = prev;
-				}
-				break;
-			}
-			free_record(prev);
-		}
-	}
-	return res;
-}
-
 /**
  * rt_plot_display_info - write information about @time into @s
  */
@@ -128,14 +250,22 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 	long long pdiff, rdiff;
 	int eid;
 
+	/* printf("\nBegin display\n"); */
+
 	/* Write plot-specific data */
 	data_record = rt_info->write_header(rt_info, ginfo, s, time);
+	/* printf("Data record: "); print_record(data_record); */
 
 	/* Select closest relevant record */
 	range = 2 / ginfo->resolution;
 
+
 	record = __find_rt_record(ginfo, rt_info, time, 1, range);
 	prev_record = find_prev_display_record(ginfo, rt_info, time, range);
+	//prev_record = NULL;
+
+	/* printf("Next: "); print_record(record); */
+	/* printf("Prev: "); print_record(prev_record); */
 
 	if (!record) {
 		record = prev_record;
@@ -144,34 +274,42 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 		rtime = get_rts(ginfo, record);
 		pdiff = (ptime < time) ? time - ptime : ptime - time;
 		rdiff = (rtime < time) ? time - rtime : rtime - time;
-		record = (pdiff < rdiff) ? prev_record : record;
+		if (pdiff < rdiff) {
+			free_record(record);
+			record = prev_record;
+		} else {
+			free_record(prev_record);
+		}
 	}
 
 	/* Write event info */
 	if (record) {
-		rts = get_rts(ginfo, record);
-		eid = pevent_data_type(ginfo->pevent, record);
+		/* rts = get_rts(ginfo, record); */
+		/* eid = pevent_data_type(ginfo->pevent, record); */
 
-		if (in_res(ginfo, rts, time)) {
-			event = pevent_data_event_from_type(ginfo->pevent, eid);
-			if (event) {
-				trace_seq_putc(s, '\n');
-				trace_seq_puts(s, event->name);
-				trace_seq_putc(s, '\n');
-				pevent_event_info(s, event, record);
-			} else
-				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
-		}
+		/* if (in_res(ginfo, rts, time)) { */
+		/* 	event = pevent_data_event_from_type(ginfo->pevent, eid); */
+		/* 	if (event) { */
+		/* 		trace_seq_putc(s, '\n'); */
+		/* 		trace_seq_puts(s, event->name); */
+		/* 		trace_seq_putc(s, '\n'); */
+		/* 		pevent_event_info(s, event, record); */
+		/* 	} else */
+		/* 		trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid); */
+		/* } */
 		free_record(record);
+		/* printf("Freed record: "); print_record(record); */
 	}
 
 	/* Metadata */
 	trace_seq_putc(s, '\n');
 	nano_to_milli(time, &msec, &nsec);
 	trace_seq_printf(s, "%llu.%06llu ms", msec, nsec);
+
 	if (data_record) {
 		trace_seq_printf(s, " CPU: %03d", data_record->cpu);
 		free_record(data_record);
+		/* printf("Freed data: "); print_record(data_record); */
 	}
 
 	return 1;
@@ -360,6 +498,64 @@ int is_task_running(struct graph_info *ginfo,
 	return running;
 }
 
+void iterate(struct graph_info *ginfo, int reverse, iterate_cb cb, void *data)
+{
+	int proceed, cpu;
+	struct record *next, *prev;
+	struct record_list list;
+	struct record_list *nodes, *node;
+
+	nodes = malloc_or_die(sizeof(*nodes) * ginfo->cpus);
+	memset(nodes, 0, sizeof(*nodes) * ginfo->cpus);
+	memset(&list, 0, sizeof(list));
+
+	/* Maintains a list of the next record on each cpu, sorted by
+	 * timestamp. Start with the first record on each cpu.
+	 */
+	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
+		next = tracecmd_peek_data(ginfo->handle, cpu);
+		if (next) {
+			if (reverse) {
+				prev = next;
+				next = tracecmd_read_prev(ginfo->handle, prev);
+				if (prev != next && prev->data) {
+					free_record(prev);
+				}
+			}
+			insert_record(ginfo, &list, next, &nodes[cpu], reverse);
+		}
+	}
+
+	/* Read sequentially from all cpus */
+	while (pop_record(ginfo, &list, &node)) {
+		next = node->record;
+
+		proceed = cb(ginfo, next, data);
+
+		if (!proceed) {
+			free_record(next);
+			break;
+		} 
+
+		prev = next;
+
+		if (!reverse) {
+			next = tracecmd_read_data(ginfo->handle, next->cpu);
+		} else {
+			next = tracecmd_read_prev(ginfo->handle, next);
+		}
+
+		free_record(prev);
+
+		insert_record(ginfo, &list, next, node, reverse);
+	}
+
+	while (pop_record(ginfo, &list, &node)) {
+		free_record(node->record);
+	}
+}
+
+
 /**
  * Find the information for the last release of @match_tid on @cpu before @time.
  *
@@ -369,63 +565,26 @@ int is_task_running(struct graph_info *ginfo,
  * Returns release record and @out_job, @out_release, and @out_deadline if a
  * release was found for @tid before @time.
  */
-void get_previous_release(struct graph_info *ginfo, int match_tid,
+void get_previous_release(struct graph_info *ginfo, struct rt_plot_common *common,
+			  int match_tid,
 			  unsigned long long time,
 			  int *out_job,
 			  unsigned long long *out_release,
 			  unsigned long long *out_deadline)
 {
-	int tid, cpu, match, job;
-	unsigned long long release, deadline, min_ts;
-	struct record *last_rec = NULL, *rec, *ret = NULL;
+	struct prev_release_args args = {
+		(time - max_rt_search(ginfo)), common, time, match_tid,
+		out_job, out_release, out_deadline};
 
-	*out_job = -2;
-
-	min_ts = time - max_rt_search(ginfo);
-
-	/* The release record could have occurred on any CPU. Search all */
-	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
-		set_cpu_to_rts(ginfo, time, cpu);
-		last_rec = tracecmd_peek_data(ginfo->handle, cpu);
-
-		/* Require a record to start with */
-		if (!last_rec) {
-			goto loop_end;
-		}
-		last_rec->ref_count++;
-
-		while ((rec = tracecmd_read_prev(ginfo->handle, last_rec))) {
-			if (get_rts(ginfo, rec) < min_ts) {
-				free_record(rec);
-
-				goto loop_end;
-			}
-
-#define ARG ginfo, rec, &tid, &job, &release, &deadline
-			match = rt_graph_check_task_release(ARG) ||
-				rt_graph_check_server_release(ARG);
-#undef ARG
-
-			free_record(last_rec);
-			last_rec = rec;
-
-			/* Only consider releases before the current time */
-			if (match && tid == match_tid && release <= time) {
-				/* Return the lastest release */
-				if (!ret || *out_job < job) {
-					free_record(ret);
-					ret = rec;
-					*out_job = job;
-					*out_release = release;
-					*out_deadline = deadline;
-				}
-				last_rec = NULL;
-				goto loop_end;
-			}
-		}
-	loop_end:
-		free_record(last_rec);
+	/* Use cached job info, if possible */
+	if (time >= common->last_job.start &&
+	    time <= common->last_job.end) {
+		*out_job = common->last_job.no;
+		*out_release = common->last_job.release;
+		*out_deadline = common->last_job.deadline;
+		return;
 	}
 
-	free_record(ret);
+	set_cpus_to_rts(ginfo, time);
+	iterate(ginfo, 1, prev_release_iterator, &args);
 }

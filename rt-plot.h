@@ -16,11 +16,28 @@ typedef struct record* (*write_header_cb)(struct rt_plot_common *rt,
 					  struct graph_info *ginfo,
 					  struct trace_seq *s,
 					  unsigned long long time);
+typedef int (*iterate_cb)(struct graph_info *ginfo, struct record *record, void *data);
+
+struct job_info {
+	unsigned long long	release;
+	unsigned long long	deadline;
+	unsigned long long	start;
+	unsigned long long	end;
+	unsigned long long	no;
+};
+
+
 struct rt_plot_common {
 	record_matches_cb 	record_matches;
 	is_drawn_cb		is_drawn;
 	write_header_cb		write_header;
+
+	/* Cache the current job info. Used in mouseovers to avoid recalulating
+	 * job information when the mouse does not cross job boundaries.
+	 */
+	struct job_info		last_job;
 };
+
 
 int
 rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
@@ -60,9 +77,13 @@ void set_cpus_to_rts(struct graph_info *ginfo,
 int is_task_running(struct graph_info *ginfo,
 		    unsigned long long time,
 		    int pid);
-void get_previous_release(struct graph_info *ginfo, int tid,
+void get_previous_release(struct graph_info *ginfo, struct rt_plot_common *common,
+			  int tid,
 			  unsigned long long time, int *job,
 			  unsigned long long *release,
 			  unsigned long long *deadline);
+
+void iterate(struct graph_info *ginfo, int reverse, iterate_cb cb, void *data);
+
 
 #endif

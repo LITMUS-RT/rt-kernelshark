@@ -719,8 +719,11 @@ void free_record(struct record *record)
 	if (!record)
 		return;
 
-	if (!record->ref_count)
+	if (!record->ref_count) {
+		struct record *rec = NULL;
+		rec->ref_count = 2;
 		die("record ref count is zero!");
+	}
 
 	record->ref_count--;
 

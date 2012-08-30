@@ -1863,7 +1863,6 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
 	gint cpu, pid;
-	gboolean started;
 	struct record *record;
 	struct plot_hash *hash;
 	struct plot_list *list;
@@ -1882,7 +1881,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 
 		// TODO: hack to clean up until first release, make unhacky
 		if (ginfo->rtg_info.clean_records &&
-		    ginfo->rtg_info.start_time == 0) {
+		    (ginfo->rtg_info.start_time == 0 || ginfo->view_start_time < ginfo->rtg_info.start_time)) {
 			unsigned long long dull, rel = 0;
 			char *dchar;
 			int dint;
@@ -1964,6 +1963,8 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		set_color(ginfo->draw, plot->gc, plot->last_color);
 	}
 
+	printf("we here1\n");
+
 	trace_set_cursor(GDK_WATCH);
 	/* Shortcut if we don't have any task plots */
 	if (!ginfo->nr_task_hash && !ginfo->all_recs) {
@@ -1990,6 +1991,8 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		}
 		goto out;
 	}
+
+	printf("we here\n");
 
 	draw_hashed_plots(ginfo);
 
@@ -2097,8 +2100,10 @@ static void draw_timeline(struct graph_info *ginfo, gint width)
 static void draw_info(struct graph_info *ginfo,
 		      gint new_width)
 {
+	printf("we going?\n");
 	if (!ginfo->handle)
 		return;
+	printf("we gone\n");
 
 	ginfo->resolution = (gdouble)new_width / (gdouble)(ginfo->view_end_time -
 							   ginfo->view_start_time);
@@ -2107,6 +2112,7 @@ static void draw_info(struct graph_info *ginfo,
 
 	draw_timeline(ginfo, new_width);
 
+	printf("drawing plots\n");
 	draw_plots(ginfo, new_width);
 
 	ginfo->read_comms = FALSE;
@@ -2323,6 +2329,7 @@ static void redraw_pixmap_backend(struct graph_info *ginfo)
 
 	if (old_pix)
 		g_object_unref(old_pix);
+
 
 	if (ginfo->hadj_value) {
 //		gtk_adjustment_set_lower(ginfo->hadj, -100.0);

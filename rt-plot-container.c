@@ -40,7 +40,7 @@ int get_server_info(struct graph_info *ginfo, struct rt_plot_common *rt,
 	*out_release = *out_deadline = *out_job = *out_tid = 0;
 
 	/* Get current job info for server task */
-	get_previous_release(ginfo, sid, time,
+	get_previous_release(ginfo, rt, sid, time,
 			     out_job, out_release, out_deadline);
 
 	/* Need to reset back to current location */

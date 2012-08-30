@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "trace-graph.h"
 #include "trace-filter.h"
 
@@ -133,7 +134,7 @@ static int get_time_info(struct graph_info *ginfo,
 		goto out;
 	}
 
-	get_previous_release(ginfo, rtt_info->pid, time,
+	get_previous_release(ginfo, &rtt_info->common, rtt_info->pid, time,
 			     out_job, out_release, out_deadline);
  out:
 	return 1;
@@ -492,7 +493,7 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 	const char *comm;
 	int pid, job = -1, found;
 	struct record *record;
-	unsigned long long release, deadline;
+	unsigned long long release = 0, deadline = 0;
 	struct rt_task_info *rtt_info = (struct rt_task_info*)rt;
 
 	found = get_time_info(ginfo, rtt_info, time,
@@ -502,7 +503,11 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 
 	pid = rtt_info->pid;
 	comm = pevent_data_comm_from_pid(ginfo->pevent, pid);
-	trace_seq_printf(s, "%s-%d:%d\n", comm, pid, job);
+	trace_seq_printf(s, "%s-%d", comm, pid);
+	if (job != -1) {
+		trace_seq_printf(s, ":%d", job);
+	}
+	trace_seq_putc(s, '\n');
 
 	if (in_res(ginfo, deadline, time)) {
 		trace_seq_printf(s, "\nlitmus_deadline\n"
@@ -514,6 +519,11 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 				 "release(job(%d,%d)): %llu\n",
 				 pid, job, release);
 	}
+
+	if (deadline != 0 && deadline < time) {
+		trace_seq_printf(s, "\nTARDY\n");
+	}
+
  out:
 	return record;
 }
@@ -634,6 +644,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 	if (!params)
 		die ("RT task %d added without RT params!\n", pid);
 	rtt_info = malloc_or_die(sizeof(*rtt_info));
+	memset(rtt_info, 0, sizeof(*rtt_info));
 	rtt_info->pid = pid;
 	rtt_info->label = malloc_or_die(LLABEL);
 	rtt_info->block_label = malloc_or_die(LLABEL);

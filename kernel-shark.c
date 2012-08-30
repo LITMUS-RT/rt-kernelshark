@@ -303,7 +303,9 @@ int kernelshark_load_file(struct shark_info *info, const char *file)
 	display_warnings = 0;
 	pr_stat("\nLoading file %s", file);
 	trace_dialog_register_alt_warning(alt_warn);
+	printf("load\n");
 	handle = tracecmd_open(file);
+	printf("loaded %d\n", handle);
 	trace_dialog_register_alt_warning(NULL);
 	if (display_warnings) {
 		errno = 0;
@@ -313,6 +315,7 @@ int kernelshark_load_file(struct shark_info *info, const char *file)
 	if (!handle)
 		return -1;
 
+	printf("loaded good\n");
 	tracecmd_close(info->handle);
 	info->handle = handle;
 	trace_graph_load_handle(info->ginfo, handle);
@@ -1850,11 +1853,14 @@ void kernel_shark(int argc, char **argv)
 			break;
 		case 'c':
 			clean = 1;
+			break;
 		default:
 			/* assume the other options are for gtk */
 			break;
 		}
 	}
+
+
 
 	if ((argc - optind) >= 1) {
 		if (input_file)
