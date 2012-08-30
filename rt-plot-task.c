@@ -677,8 +677,20 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 void rt_plot_add_all_tasks(struct graph_info *ginfo)
  {
 	gint *tasks;
-	int i;
+	int i, j, len, tmp;
 	tasks = task_list_pids(ginfo->rtg_info.tasks);
-	for (i = 0; tasks[i] != -1; i++)
+
+	for (i = 0; tasks[i] != -1; ++i) {
+		for (j = i; tasks[j] != -1; ++j) {
+			if (tasks[i] > tasks[j]) {
+				tmp = tasks[i];
+				tasks[i] = tasks[j];
+				tasks[j] = tmp;
+			}
+		}
+	}
+
+	for (i = 0; tasks[i] != -1; ++i) {
 		rt_plot_task(ginfo, tasks[i], ginfo->plots);
+	}
 }

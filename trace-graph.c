@@ -1859,6 +1859,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
+int tries = 0;
 
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
@@ -1870,6 +1871,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 	set_cpus_to_rts(ginfo, ginfo->view_start_time);
 
 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
+		int first = ginfo->rtg_info.start_time == 0;
 		if (get_rts(ginfo, record) < ginfo->view_start_time) {
 			free_record(record);
 			continue;
@@ -1898,11 +1900,14 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 #undef ARG
 			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
 				dull = rel - .1 * (ginfo->view_end_time - rel);;
-				ginfo->rtg_info.start_time = dull;
-				ginfo->view_start_time = dull;
+				ginfo->rtg_info.start_time = get_rts(ginfo, record);
+				ginfo->view_start_time = get_rts(ginfo, record);
+				if (first)
+					return;
 			}
 
 			free_record(record);
+
 			continue;
 		}
 
@@ -1966,33 +1971,31 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 	printf("we here1\n");
 
 	trace_set_cursor(GDK_WATCH);
-	/* Shortcut if we don't have any task plots */
-	if (!ginfo->nr_task_hash && !ginfo->all_recs) {
-		tracecmd_set_all_cpus_to_timestamp(ginfo->handle,
-						   ginfo->view_start_time);
-		for (cpu = 0; cpu < ginfo->cpus; cpu++) {
-			hash = trace_graph_plot_find_cpu(ginfo, cpu);
-			if (!hash)
-				continue;
+	/* /\* Shortcut if we don't have any task plots *\/ */
+	/* if (!ginfo->nr_task_hash && !ginfo->all_recs) { */
+	/* 	tracecmd_set_all_cpus_to_timestamp(ginfo->handle, */
+	/* 					   ginfo->view_start_time); */
+	/* 	for (cpu = 0; cpu < ginfo->cpus; cpu++) { */
+	/* 		hash = trace_graph_plot_find_cpu(ginfo, cpu); */
+	/* 		if (!hash) */
+	/* 			continue; */
 
-			while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
-				if (record->ts < ginfo->view_start_time) {
-					free_record(record);
-					continue;
-				}
-				if (record->ts > ginfo->view_end_time) {
-					free_record(record);
-					break;
-				}
-				for (list = hash->plots; list; list = list->next)
-					draw_plot(ginfo, list->plot, record);
-				free_record(record);
-			}
-		}
-		goto out;
-	}
-
-	printf("we here\n");
+	/* 		while ((record = tracecmd_read_data(ginfo->handle, cpu))) { */
+	/* 			if (record->ts < ginfo->view_start_time) { */
+	/* 				free_record(record); */
+	/* 				continue; */
+	/* 			} */
+	/* 			if (record->ts > ginfo->view_end_time) { */
+	/* 				free_record(record); */
+	/* 				break; */
+	/* 			} */
+	/* 			for (list = hash->plots; list; list = list->next) */
+	/* 				draw_plot(ginfo, list->plot, record); */
+	/* 			free_record(record); */
+	/* 		} */
+	/* 	} */
+	/* 	goto out; */
+	/* } */
 
 	draw_hashed_plots(ginfo);
 
@@ -2337,8 +2340,6 @@ static void redraw_pixmap_backend(struct graph_info *ginfo)
 	}
 }
 
-static int tries = 0;
-
 static gboolean
 configure_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 {
@@ -2346,10 +2347,7 @@ configure_event(GtkWidget *widget, GdkEventMotion *event, gpointer data)
 
 	gtk_widget_set_size_request(widget, ginfo->draw_width, ginfo->draw_height);
 
-	// TODO: don't do this, compare widget to figure out if we should redraw
-	if (tries != 2)
-		redraw_pixmap_backend(ginfo);
-	++tries;
+	redraw_pixmap_backend(ginfo);
 
 	/* debug */
 	ginfo->hadj_value = gtk_adjustment_get_value(ginfo->hadj);
