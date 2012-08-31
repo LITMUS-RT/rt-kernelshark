@@ -427,6 +427,8 @@ void graph_plot_cpus_update_callback(gboolean accept,
 				     guint64 *selected_cpu_mask,
 				     gpointer data);
 
+int is_high_res(struct graph_info *ginfo);
+
 static inline void convert_nano(unsigned long long time, unsigned long *sec,
 				unsigned long *usec)
 {

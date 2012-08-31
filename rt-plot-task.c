@@ -473,12 +473,15 @@ rt_task_plot_record_matches(struct rt_plot_common *rt,
 	 */
 #define ARG ginfo, record, &pid
 	match = rt_graph_check_switch_to(ARG, &dint, &dull)           ||
-		rt_graph_check_switch_away(ARG, &dint,  &dull)        ||
-		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
-		rt_graph_check_task_completion(ARG, &dint, &dull)     ||
-		rt_graph_check_task_block(ARG, &dint, &dull)          ||
-		rt_graph_check_task_resume(ARG, &dint, &dull)	      ||
-		rt_graph_check_any(ARG, &dint, &dull);
+		rt_graph_check_switch_away(ARG, &dint,  &dull);
+	if (is_high_res(ginfo)) {
+		match = match ||
+			rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
+			rt_graph_check_task_completion(ARG, &dint, &dull)     ||
+			rt_graph_check_task_block(ARG, &dint, &dull)          ||
+			rt_graph_check_task_resume(ARG, &dint, &dull)	      ||
+			rt_graph_check_any(ARG, &dint, &dull);
+	}
 #undef ARG
 	return pid == match_pid;
 }

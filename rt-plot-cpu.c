@@ -345,8 +345,12 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 
 	match = try_switch_away(ginfo, rtc_info, record, info) ||
 		try_switch_to(ginfo, rtc_info, record, info)   ||
-		try_completion(ginfo, rtc_info, record, info)  ||
 		try_sched_switch(ginfo, rtc_info, record, info);
+
+	if (is_high_res(ginfo)) {
+		match = match || try_completion(ginfo, rtc_info, record, info);
+
+	}
 
 	if (!match) {
 		/* TODO: this should not be necessary!
@@ -354,12 +358,12 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		 * is_displayed will not work here or in any other methods.
 		 */
 #define ARG ginfo,record, &pid
-		rt_graph_check_task_param(ARG, &dull, &dull);
-		rt_graph_check_container_param(ARG, &dchar);
-		rt_graph_check_server_param(ARG, &dint, &dull, &dull);
-		rt_graph_check_task_release(ARG, &dint, &dull, &dull);
-		rt_graph_check_task_block(ARG, &dint, &dull);
-		rt_graph_check_task_resume(ARG, &dint,  &dull);
+		rt_graph_check_task_param(ARG, &dull, &dull) ||
+		rt_graph_check_container_param(ARG, &dchar)  ||
+		rt_graph_check_server_param(ARG, &dint, &dull, &dull) ||
+		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
+		rt_graph_check_task_block(ARG, &dint, &dull)   ||
+		rt_graph_check_task_resume(ARG, &dint,  &dull) ||
 		rt_graph_check_any(ARG, &eid, &ts);
 #undef ARG
 

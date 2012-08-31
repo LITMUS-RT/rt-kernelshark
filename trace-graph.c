@@ -92,7 +92,7 @@ static int convert_dist_to_time(struct graph_info *ginfo, int dist)
 	return convert_x_to_time(ginfo, dist) - convert_x_to_time(ginfo, 0);
 }
 
-static int is_high_res(struct graph_info *ginfo)
+int is_high_res(struct graph_info *ginfo)
 {
 	return convert_dist_to_time(ginfo, PLOT_TRI_SIZE) < MAX_TRI_TIME;
 }
@@ -1867,6 +1867,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 	struct record *record;
 	struct plot_hash *hash;
 	struct plot_list *list;
+	unsigned long long old_start;
 
 	set_cpus_to_rts(ginfo, ginfo->view_start_time);
 
@@ -1899,8 +1900,9 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			rt_graph_check_server_param(ARG, &dint, &dull, &dull);
 #undef ARG
 			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
-				dull = rel - .1 * (ginfo->view_end_time - rel);;
+				dull = rel - .1 * (ginfo->view_end_time - rel);
 				ginfo->rtg_info.start_time = get_rts(ginfo, record);
+				//ginfo->view_end_time -= get_rts(ginfo, record) - ginfo->view_start_time;
 				ginfo->view_start_time = get_rts(ginfo, record);
 				if (first)
 					return;
