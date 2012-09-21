@@ -42,7 +42,7 @@
 #define ___stringify(X) #X
 #define __stringify(X) ___stringify(X)
 
-#define DEBUG_LEVEL	0
+#define DEBUG_LEVEL 0
 #if DEBUG_LEVEL > 0
 # define dprintf(l, x...)			\
 	do {					\
@@ -2421,7 +2421,7 @@ void kernel_shark(int argc, char **argv)
 	info->ginfo->rtg_info.clean_records = clean;
 	info->ginfo->rtg_info.start_offset = start;
 	info->ginfo->rtg_info.duration = duration;
-	
+
 	widget = trace_graph_get_window(info->ginfo);
 	gtk_paned_add1(GTK_PANED(vpaned), widget);
 	gtk_widget_show(widget);

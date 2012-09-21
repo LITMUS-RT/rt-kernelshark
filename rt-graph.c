@@ -208,8 +208,16 @@ int rt_graph_check_any(struct graph_info *ginfo,
 	if (!field)
 		field = add_ts_hash(rtg_info->events, eid, key, pevent, record);
 
+	if (!field) {
+		dprintf(2, "No field '%s' for rid %d\n", RT_TS_FIELD, eid);
+		*ts = 0;
+	} else {
+		dprintf(2, "Found field '%s' for rid %d\n", RT_TS_FIELD, eid);
+		pevent_read_number_field(field, record->data, ts);
+	}
+
 	*epid = pevent_data_pid(pevent, record);
-	pevent_read_number_field(field, record->data, ts);
+
 
 	dprintf(3, "Read (%d) record for task %d at %llu\n",
 		eid, *epid, *ts);
@@ -946,7 +954,7 @@ unsigned long long
 get_rts(struct graph_info *ginfo, struct record *record)
 {
 	gint epid, eid;
-	unsigned long long ts;
+	unsigned long long ts = 0;
 	if (!record->cached_rts) {
 		rt_graph_check_any(ginfo, record, &epid, &eid, &ts);
 		record->cached_rts = ts;

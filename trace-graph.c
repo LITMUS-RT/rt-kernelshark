@@ -35,7 +35,7 @@
 
 #include "util.h"
 
-#define DEBUG_LEVEL	0
+#define DEBUG_LEVEL 0
 #if DEBUG_LEVEL > 0
 # define dprintf(l, x...)			\
 	do {					\
@@ -1876,7 +1876,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 	clean = ginfo->rtg_info.clean_records;
 
 	set_cpus_to_rts(ginfo, ginfo->view_start_time);
-	
+
 	max_time = ginfo->view_end_time;
 	min_time = ginfo->view_start_time;
 
@@ -1885,18 +1885,22 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 
 		if (get_rts(ginfo, record) < min_time) {
 			free_record(record);
+			dprintf(3, "%llu < %llu, skipping\n",
+				get_rts(ginfo, record), min_time);
 			continue;
 		}
 
 		if (get_rts(ginfo, record) > max_time) {
 			free_record(record);
+			dprintf(3, "%llu > %llu, breaking\n",
+				get_rts(ginfo, record), min_time);
 			break;
 		}
 
 		// TODO: hack to clean up until first release, make unhacky
 		if (ginfo->rtg_info.clean_records &&
 		    (ginfo->rtg_info.start_time == 0 || get_rts(ginfo, record) < ginfo->rtg_info.start_time)) {
-			unsigned long long dull, rel = 0;
+			unsigned long long dull, rel;
 			char *dchar;
 			int dint;
 
@@ -1916,6 +1920,9 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 				ginfo->view_start_time = min_time;
 				ginfo->start_time = min_time;
 
+				dprintf(3, "found release at %llu, min_time now %llu \n",
+					rel, min_time);
+
 				if (ginfo->rtg_info.duration) {
 					max_time = MIN(max_time, min_time + ginfo->rtg_info.duration * NSECS_PER_SEC);
 					ginfo->view_end_time = max_time;
@@ -1928,6 +1935,9 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			}
 
 			free_record(record);
+
+			dprintf(3, "haven't released yet, skipping %llu\n",
+				get_rts(ginfo, record));
 
 			continue;
 		}
