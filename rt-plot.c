@@ -19,7 +19,6 @@ void insert_record(struct graph_info *ginfo, struct record_list *list,
 	if (node->next)
 		die("Node is in use!");
 	if (!record) {
-		printf("No record\n");
 		return;
 	}
 
@@ -134,7 +133,6 @@ prev_display_iterator(struct graph_info *ginfo, struct record *record, void *dat
 	if (!ignored && args->common->record_matches(args->common, ginfo, record)) {
 		args->result = record;
 		++record->ref_count;
-		printf("success!\n");
 		return 0;
 	} else {
 		return 1;
@@ -250,22 +248,14 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 	long long pdiff, rdiff;
 	int eid;
 
-	/* printf("\nBegin display\n"); */
-
 	/* Write plot-specific data */
 	data_record = rt_info->write_header(rt_info, ginfo, s, time);
-	/* printf("Data record: "); print_record(data_record); */
 
 	/* Select closest relevant record */
 	range = 2 / ginfo->resolution;
 
-
 	record = __find_rt_record(ginfo, rt_info, time, 1, range);
 	prev_record = find_prev_display_record(ginfo, rt_info, time, range);
-	//prev_record = NULL;
-
-	/* printf("Next: "); print_record(record); */
-	/* printf("Prev: "); print_record(prev_record); */
 
 	if (!record) {
 		record = prev_record;
@@ -284,21 +274,20 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 
 	/* Write event info */
 	if (record) {
-		/* rts = get_rts(ginfo, record); */
-		/* eid = pevent_data_type(ginfo->pevent, record); */
+		rts = get_rts(ginfo, record);
+		eid = pevent_data_type(ginfo->pevent, record);
 
-		/* if (in_res(ginfo, rts, time)) { */
-		/* 	event = pevent_data_event_from_type(ginfo->pevent, eid); */
-		/* 	if (event) { */
-		/* 		trace_seq_putc(s, '\n'); */
-		/* 		trace_seq_puts(s, event->name); */
-		/* 		trace_seq_putc(s, '\n'); */
-		/* 		pevent_event_info(s, event, record); */
-		/* 	} else */
-		/* 		trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid); */
-		/* } */
+		if (in_res(ginfo, rts, time)) {
+			event = pevent_data_event_from_type(ginfo->pevent, eid);
+			if (event) {
+				trace_seq_putc(s, '\n');
+				trace_seq_puts(s, event->name);
+				trace_seq_putc(s, '\n');
+				pevent_event_info(s, event, record);
+			} else
+				trace_seq_printf(s, "\nUNKNOWN EVENT %d\n", eid);
+		}
 		free_record(record);
-		/* printf("Freed record: "); print_record(record); */
 	}
 
 	/* Metadata */
@@ -309,7 +298,6 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 	if (data_record) {
 		trace_seq_printf(s, " CPU: %03d", data_record->cpu);
 		free_record(data_record);
-		/* printf("Freed data: "); print_record(data_record); */
 	}
 
 	return 1;

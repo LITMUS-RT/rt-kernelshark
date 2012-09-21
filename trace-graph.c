@@ -1149,8 +1149,9 @@ static void draw_plot_info(struct graph_info *ginfo, struct graph_plot *plot,
 
 	trace_seq_init(&s);
 
-	dprintf(3, "start=%llu end=%llu time=%llu\n",
-		(u64)ginfo->start_time, (u64)ginfo->end_time, (u64)time);
+	dprintf(3, "start=%llu end=%llu time=%llu, vstart: %llu, vend: %llu\n",
+		(u64)ginfo->start_time, (u64)ginfo->end_time, (u64)time,
+		(u64)ginfo->view_start_time, (u64)ginfo->view_end_time);
 
 	if (!trace_graph_plot_display_info(ginfo, plot, &s, time)) {
 		/* Just display the current time */
@@ -1381,7 +1382,6 @@ static void zoom_in_window(struct graph_info *ginfo, gint start, gint end)
 	dprintf(1, "*** ended with with ");
 	print_time(convert_x_to_time(ginfo, ginfo->hadj_value));
 	dprintf(1, "\n");
-
 }
 
 static gboolean
@@ -1859,32 +1859,43 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
 }
 
-int tries = 0;
-
+/*
+ * TODO: this method needs refactoring
+ */
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
-	gint cpu, pid;
+	gint cpu, pid, clean;
 	struct record *record;
 	struct plot_hash *hash;
 	struct plot_list *list;
-	unsigned long long old_start;
+	unsigned long long old_start, max_time, min_time;
+	gdouble duration, start;
+
+	start = ginfo->rtg_info.start_offset;
+	duration = ginfo->rtg_info.duration;
+	clean = ginfo->rtg_info.clean_records;
 
 	set_cpus_to_rts(ginfo, ginfo->view_start_time);
+	
+	max_time = ginfo->view_end_time;
+	min_time = ginfo->view_start_time;
 
 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
 		int first = ginfo->rtg_info.start_time == 0;
-		if (get_rts(ginfo, record) < ginfo->view_start_time) {
+
+		if (get_rts(ginfo, record) < min_time) {
 			free_record(record);
 			continue;
 		}
-		if (get_rts(ginfo, record) > ginfo->view_end_time) {
+
+		if (get_rts(ginfo, record) > max_time) {
 			free_record(record);
 			break;
 		}
 
 		// TODO: hack to clean up until first release, make unhacky
 		if (ginfo->rtg_info.clean_records &&
-		    (ginfo->rtg_info.start_time == 0 || ginfo->view_start_time < ginfo->rtg_info.start_time)) {
+		    (ginfo->rtg_info.start_time == 0 || get_rts(ginfo, record) < ginfo->rtg_info.start_time)) {
 			unsigned long long dull, rel = 0;
 			char *dchar;
 			int dint;
@@ -1900,18 +1911,27 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			rt_graph_check_server_param(ARG, &dint, &dull, &dull);
 #undef ARG
 			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
-				dull = rel - .1 * (ginfo->view_end_time - rel);
-				ginfo->rtg_info.start_time = get_rts(ginfo, record);
-				//ginfo->view_end_time -= get_rts(ginfo, record) - ginfo->view_start_time;
-				ginfo->view_start_time = get_rts(ginfo, record);
-				if (first)
+				min_time = rel + ginfo->rtg_info.start_offset * NSECS_PER_SEC;
+				ginfo->rtg_info.start_time = min_time;
+				ginfo->view_start_time = min_time;
+				ginfo->start_time = min_time;
+
+				if (ginfo->rtg_info.duration) {
+					max_time = MIN(max_time, min_time + ginfo->rtg_info.duration * NSECS_PER_SEC);
+					ginfo->view_end_time = max_time;
+					ginfo->end_time = max_time;
+				}
+				if (first) {
+					free_record(record);
 					return;
+				}
 			}
 
 			free_record(record);
 
 			continue;
 		}
+
 
 		hash = trace_graph_plot_find_cpu(ginfo, cpu);
 		if (hash) {
@@ -1970,38 +1990,10 @@ static void draw_plots(struct graph_info *ginfo, gint new_width)
 		set_color(ginfo->draw, plot->gc, plot->last_color);
 	}
 
-	printf("we here1\n");
-
 	trace_set_cursor(GDK_WATCH);
-	/* /\* Shortcut if we don't have any task plots *\/ */
-	/* if (!ginfo->nr_task_hash && !ginfo->all_recs) { */
-	/* 	tracecmd_set_all_cpus_to_timestamp(ginfo->handle, */
-	/* 					   ginfo->view_start_time); */
-	/* 	for (cpu = 0; cpu < ginfo->cpus; cpu++) { */
-	/* 		hash = trace_graph_plot_find_cpu(ginfo, cpu); */
-	/* 		if (!hash) */
-	/* 			continue; */
-
-	/* 		while ((record = tracecmd_read_data(ginfo->handle, cpu))) { */
-	/* 			if (record->ts < ginfo->view_start_time) { */
-	/* 				free_record(record); */
-	/* 				continue; */
-	/* 			} */
-	/* 			if (record->ts > ginfo->view_end_time) { */
-	/* 				free_record(record); */
-	/* 				break; */
-	/* 			} */
-	/* 			for (list = hash->plots; list; list = list->next) */
-	/* 				draw_plot(ginfo, list->plot, record); */
-	/* 			free_record(record); */
-	/* 		} */
-	/* 	} */
-	/* 	goto out; */
-	/* } */
 
 	draw_hashed_plots(ginfo);
 
-out:
 	for (i = 0; i < ginfo->plots; i++) {
 		plot = ginfo->plot_array[i];
 		draw_plot(ginfo, plot, NULL);
@@ -2010,6 +2002,7 @@ out:
 			gdk_gc_unref(plot->gc);
 		plot->gc = NULL;
 	}
+
 	trace_put_cursor();
 }
 
@@ -2105,10 +2098,8 @@ static void draw_timeline(struct graph_info *ginfo, gint width)
 static void draw_info(struct graph_info *ginfo,
 		      gint new_width)
 {
-	printf("we going?\n");
 	if (!ginfo->handle)
 		return;
-	printf("we gone\n");
 
 	ginfo->resolution = (gdouble)new_width / (gdouble)(ginfo->view_end_time -
 							   ginfo->view_start_time);
@@ -2117,7 +2108,6 @@ static void draw_info(struct graph_info *ginfo,
 
 	draw_timeline(ginfo, new_width);
 
-	printf("drawing plots\n");
 	draw_plots(ginfo, new_width);
 
 	ginfo->read_comms = FALSE;

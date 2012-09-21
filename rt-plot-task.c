@@ -512,12 +512,12 @@ rt_task_plot_write_header(struct rt_plot_common *rt,
 	}
 	trace_seq_putc(s, '\n');
 
-	if (in_res(ginfo, deadline, time)) {
+	if (is_high_res(ginfo) && in_res(ginfo, deadline, time)) {
 		trace_seq_printf(s, "\nlitmus_deadline\n"
 				 "deadline(job(%d,%d)): %llu\n",
 				 pid, job, deadline);
 	}
-	if (in_res(ginfo, release, time)) {
+	if (is_high_res(ginfo) && in_res(ginfo, release, time)) {
 		trace_seq_printf(s, "\nlitmus_release\n"
 				 "release(job(%d,%d)): %llu\n",
 				 pid, job, release);
@@ -563,8 +563,7 @@ void rt_plot_task_update_callback(gboolean accept,
 		select_size = i;
 	}
 
-	/*
-	 * Remove and add task plots.
+	/* Remove and add task plots.
 	 * Go backwards, since removing a plot shifts the
 	 * array from current position back.
 	 */
@@ -582,8 +581,7 @@ void rt_plot_task_update_callback(gboolean accept,
 		ptr = bsearch(&rtt_info->pid, selected, select_size,
 			      sizeof(gint), id_cmp);
 		if (ptr) {
-			/*
-			 * This plot plot already exists, remove it
+			/* This plot plot already exists, remove it
 			 * from the selected array.
 			 */
 			memmove(ptr, ptr + 1,
@@ -683,6 +681,7 @@ void rt_plot_add_all_tasks(struct graph_info *ginfo)
 	int i, j, len, tmp;
 	tasks = task_list_pids(ginfo->rtg_info.tasks);
 
+	/* Awful sort */
 	for (i = 0; tasks[i] != -1; ++i) {
 		for (j = i; tasks[j] != -1; ++j) {
 			if (tasks[i] > tasks[j]) {

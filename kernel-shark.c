@@ -66,6 +66,8 @@ void usage(char *prog)
 	printf("  -v	Display version and exit\n");
 	printf("  -i	input_file, default is %s\n", default_input_file);
 	printf("  -c	Ignore records before system release\n");
+	printf("  -s	(float) Seconds after first record to begin displaying\n");
+	printf("  -d	(float) Seconds of data to display\n");
 }
 
 static gboolean display_warnings;
@@ -1831,6 +1833,9 @@ void kernel_shark(int argc, char **argv)
 	int ret;
 	int c;
 	int clean;
+	double start = 0.0;
+	double duration = 0.0;
+	
 
 	g_thread_init(NULL);
 	gdk_threads_init();
@@ -1838,7 +1843,7 @@ void kernel_shark(int argc, char **argv)
 	gtk_init(&argc, &argv);
 
 	clean = 0;
-	while ((c = getopt(argc, argv, "hcvi:")) != -1) {
+	while ((c = getopt(argc, argv, "hcvs:d:i:")) != -1) {
 		switch(c) {
 		case 'h':
 			usage(basename(argv[0]));
@@ -1853,6 +1858,12 @@ void kernel_shark(int argc, char **argv)
 			break;
 		case 'c':
 			clean = 1;
+			break;
+		case 's':
+			start = atof(optarg);
+			break;
+		case 'd':
+			duration = atof(optarg);
 			break;
 		default:
 			/* assume the other options are for gtk */
@@ -2408,6 +2419,9 @@ void kernel_shark(int argc, char **argv)
 
 	info->ginfo = trace_graph_create_with_callbacks(handle, &info->graph_cbs);
 	info->ginfo->rtg_info.clean_records = clean;
+	info->ginfo->rtg_info.start_offset = start;
+	info->ginfo->rtg_info.duration = duration;
+	
 	widget = trace_graph_get_window(info->ginfo);
 	gtk_paned_add1(GTK_PANED(vpaned), widget);
 	gtk_widget_show(widget);

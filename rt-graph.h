@@ -24,6 +24,9 @@ struct rt_graph_info {
 	/* For ignoring records before system release */
 	gboolean		clean_records;
 	long long 		start_time;
+	long long		end_time;
+	gdouble			start_offset;
+	gdouble			duration;
 
 	/* List of all real-time tasks */
 	struct task_list 	*tasks[TASK_HASH_SIZE];
