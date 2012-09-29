@@ -70,9 +70,9 @@ find_rt_display_record(struct graph_info *ginfo,
 
 unsigned long long next_rts(struct graph_info *ginfo, int cpu,
 			    unsigned long long ft_target);
-void set_cpu_to_rts(struct graph_info *ginfo,
+unsigned long long set_cpu_to_rts(struct graph_info *ginfo,
 		    unsigned long long rt_target, int cpu);
-void set_cpus_to_rts(struct graph_info *ginfo,
+unsigned long long set_cpus_to_rts(struct graph_info *ginfo,
 		     unsigned long long rt_target);
 int is_task_running(struct graph_info *ginfo,
 		    unsigned long long time,

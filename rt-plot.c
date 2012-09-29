@@ -377,7 +377,7 @@ next_rts(struct graph_info *ginfo, int cpu, unsigned long long ft_target)
  * The @cpu seek location will be placed before the given time, but will
  * not necessarily be placed _right_ before the time.
  */
-void
+unsigned long long
 set_cpu_to_rts(struct graph_info *ginfo, unsigned long long rt_target, int cpu)
 {
 	struct record *record;
@@ -429,16 +429,21 @@ set_cpu_to_rts(struct graph_info *ginfo, unsigned long long rt_target, int cpu)
 		free_record(record);
 	} else
 		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, seek_time);
+	return rts;
 }
 
 /**
  * set_cpus_to_time - seek all cpus to real-time @rt_target
  */
-void set_cpus_to_rts(struct graph_info *ginfo, unsigned long long rt_target)
+unsigned long long set_cpus_to_rts(struct graph_info *ginfo, unsigned long long rt_target)
 {
 	int cpu;
-	for (cpu = 0; cpu < ginfo->cpus; cpu++)
-		set_cpu_to_rts(ginfo, rt_target, cpu);
+	unsigned long long min_rts = ULLONG_MAX;
+	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
+		unsigned long long rts = set_cpu_to_rts(ginfo, rt_target, cpu);
+		min_rts = MIN(min_rts, rts);
+	}
+	return min_rts;
 }
 
 

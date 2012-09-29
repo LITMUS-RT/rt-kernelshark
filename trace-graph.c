@@ -1915,7 +1915,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			rt_graph_check_server_param(ARG, &dint, &dull, &dull);
 #undef ARG
 			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
-				min_time = rel + ginfo->rtg_info.start_offset * NSECS_PER_SEC;
+				min_time = rel;
 				ginfo->rtg_info.start_time = min_time;
 				ginfo->view_start_time = min_time;
 				ginfo->start_time = min_time;
@@ -2542,7 +2542,7 @@ static int load_handle(struct graph_info *ginfo,
 			continue;
 
 		if (record->ts < ginfo->start_time)
-			ginfo->start_time = record->ts;
+			ginfo->start_time = get_rts(ginfo, record);
 
 		free_record(record);
 		record = tracecmd_read_cpu_last(handle, cpu);
@@ -2550,7 +2550,7 @@ static int load_handle(struct graph_info *ginfo,
 			continue;
 
 		if (record->ts > ginfo->end_time)
-			ginfo->end_time = record->ts;
+			ginfo->end_time = get_rts(ginfo, record);
 		free_record(record);
 	}
 
