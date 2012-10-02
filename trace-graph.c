@@ -721,7 +721,7 @@ do_pop_up(GtkWidget *widget, GdkEventButton *event, gpointer data)
 		gtk_widget_hide(menu_plot_task);
 	}
 
-		
+
 	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, 3,
 		       gtk_get_current_event_time());
 
@@ -1072,7 +1072,6 @@ static void draw_info_box(struct graph_info *ginfo, const gchar *buffer,
 	gint width, height;
 	GdkPixmap *pix;
 	static GdkGC *pix_bg;
-	gint view_width;
 	gint view_start;
 
 	if (!pix_bg) {
@@ -1093,7 +1092,6 @@ static void draw_info_box(struct graph_info *ginfo, const gchar *buffer,
 	height += PLOT_BOARDER * 2;
 
 	view_start = gtk_adjustment_get_value(ginfo->hadj);
-	view_width = gtk_adjustment_get_page_size(ginfo->hadj);
 	if (x > view_start + width)
 		x -= width;
 
@@ -1117,7 +1115,7 @@ static void draw_info_box(struct graph_info *ginfo, const gchar *buffer,
 			   TRUE,
 			   0, 0,
 			   width, height);
-	
+
 	gdk_draw_rectangle(pix,
 			   ginfo->draw->style->black_gc,
 			   FALSE,
@@ -1137,15 +1135,12 @@ static void draw_info_box(struct graph_info *ginfo, const gchar *buffer,
 static void draw_plot_info(struct graph_info *ginfo, struct graph_plot *plot,
 			   gint x, gint y)
 {
-	struct pevent *pevent;
 	guint64 time;
 	unsigned long sec, usec;
 	struct trace_seq s;
 
 	time =  convert_x_to_time(ginfo, x);
 	convert_nano(time, &sec, &usec);
-
-	pevent = ginfo->pevent;
 
 	trace_seq_init(&s);
 
@@ -1168,7 +1163,6 @@ static void draw_plot_info(struct graph_info *ginfo, struct graph_plot *plot,
 
 static void draw_latency(struct graph_info *ginfo, gint x, gint y)
 {
-	struct pevent *pevent;
 	unsigned long sec, usec;
 	struct trace_seq s;
 	gboolean neg;
@@ -1186,8 +1180,6 @@ static void draw_latency(struct graph_info *ginfo, gint x, gint y)
 		neg = FALSE;
 
 	convert_nano(time, &sec, &usec);
-
-	pevent = ginfo->pevent;
 
 	trace_seq_init(&s);
 	trace_seq_printf(&s, "Diff: %s%ld.%06lu secs", neg ? "-":"", sec, usec);
@@ -1860,7 +1852,7 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 }
 
 /*
- * TODO: this method needs refactoring
+ * TODO: this method needs refactoring and splitting
  */
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
@@ -1868,8 +1860,8 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 	struct record *record;
 	struct plot_hash *hash;
 	struct plot_list *list;
-	unsigned long long old_start, max_time, min_time;
-	gdouble duration, start;
+	unsigned long long max_time, min_time;
+	gdouble start, duration;
 
 	start = ginfo->rtg_info.start_offset;
 	duration = ginfo->rtg_info.duration;
@@ -1877,11 +1869,26 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 
 	set_cpus_to_rts(ginfo, ginfo->view_start_time);
 
-	max_time = ginfo->view_end_time;
 	min_time = ginfo->view_start_time;
+	max_time = ginfo->view_end_time;
+	if (ginfo->rtg_info.start_time && duration) {
+		max_time = MIN(max_time, min_time + duration * NSECS_PER_SEC);
+	}
 
 	while ((record = tracecmd_read_next_data(ginfo->handle, &cpu))) {
-		int first = ginfo->rtg_info.start_time == 0;
+		unsigned long long dull, rel;
+		char *dchar;
+		int dint;
+		/* These methods add to the lists of tasks / containers
+		 * in the system whenever a new param record is found.
+		 * Skipping these records would be very bad, so parse
+		 * them always
+		 */
+#define ARG ginfo,record, &pid
+		rt_graph_check_task_param(ARG, &dull, &dull);
+		rt_graph_check_container_param(ARG, &dchar);
+		rt_graph_check_server_param(ARG, &dint, &dull, &dull);
+#undef ARG
 
 		if (get_rts(ginfo, record) < min_time) {
 			free_record(record);
@@ -1892,46 +1899,36 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 
 		if (get_rts(ginfo, record) > max_time) {
 			free_record(record);
-			dprintf(3, "%llu > %llu, breaking\n",
+			dprintf(3, "%llu > %llu, returning\n",
 				get_rts(ginfo, record), min_time);
-			break;
+			return;
 		}
 
-		// TODO: hack to clean up until first release, make unhacky
-		if (ginfo->rtg_info.clean_records &&
-		    (ginfo->rtg_info.start_time == 0 || get_rts(ginfo, record) < ginfo->rtg_info.start_time)) {
-			unsigned long long dull, rel;
-			char *dchar;
-			int dint;
+		if (clean && (ginfo->rtg_info.start_time == 0 ||
+			      get_rts(ginfo, record) < ginfo->rtg_info.start_time)) {
 
-			// These methods add to the lists of tasks / containers
-			// in the system whenever a new param record is found.
-			// Skipping these records would be very bad, so parse
-			// them here if we are cleaning. Otherwise, draw_plot
-			// will take care of this
-#define ARG ginfo,record, &pid
-			rt_graph_check_task_param(ARG, &dull, &dull);
-			rt_graph_check_container_param(ARG, &dchar);
-			rt_graph_check_server_param(ARG, &dint, &dull, &dull);
-#undef ARG
 			if (rt_graph_check_sys_release(ginfo, record, &rel)) {
-				min_time = rel;
+				min_time = rel + start * NSECS_PER_SEC;
 				ginfo->rtg_info.start_time = min_time;
 				ginfo->view_start_time = min_time;
 				ginfo->start_time = min_time;
 
-				dprintf(3, "found release at %llu, min_time now %llu \n",
+				dprintf(3, "found release at %llu, min_time: %llu\n",
 					rel, min_time);
 
 				if (ginfo->rtg_info.duration) {
-					max_time = MIN(max_time, min_time + ginfo->rtg_info.duration * NSECS_PER_SEC);
-					ginfo->view_end_time = max_time;
-					ginfo->end_time = max_time;
+					/* This will force a resize of the
+					 * viewing window during the next pass
+					 */
+					ginfo->view_end_time = MIN(max_time,
+								   min_time + duration * NSECS_PER_SEC);
 				}
-				if (first) {
-					free_record(record);
-					return;
-				}
+
+				/* Continue reading up to the minimum time to
+				 * grab any task / container param records which
+				 * have yet to be read
+				 */
+				max_time = MAX(min_time,get_rts(ginfo, record));
 			}
 
 			free_record(record);
@@ -1957,11 +1954,12 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			}
 		}
 		for (list = ginfo->all_recs; list; list = list->next) {
-			// TODO: hacky assumption that everything else can be
-			// reached via previous hashes
-			// Should be an additional hashed list where things are
-			// added with arbitrary numbers, and a pevent_other_id
-			// which uses id ranges x < . < y to parse cids or lids
+			/* TODO: hacky assumption that everything else can be
+			 * reached via previous hashes
+			 * Should be an additional hashed list where things are
+			 * added with arbitrary numbers, and a pevent_other_id
+			 * which uses id ranges x < . < y to parse cids or lids
+			 */
 			if (list->plot->type == PLOT_TYPE_SERVER_TASK ||
 			    list->plot->type == PLOT_TYPE_SERVER_CPU) {
 				draw_plot(ginfo, list->plot, record);
@@ -1974,11 +1972,7 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 
 static void draw_plots(struct graph_info *ginfo, gint new_width)
 {
-	struct plot_list *list;
 	struct graph_plot *plot;
-	struct record *record;
-	struct plot_hash *hash;
-	gint cpu;
 	gint i;
 
 	/* Initialize plots */

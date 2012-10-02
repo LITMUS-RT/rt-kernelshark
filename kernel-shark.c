@@ -68,6 +68,7 @@ void usage(char *prog)
 	printf("  -c	Ignore records before system release\n");
 	printf("  -s	(float) Seconds after first record to begin displaying\n");
 	printf("  -d	(float) Seconds of data to display\n");
+	printf(" NOTE: -s and -d options currently require -c to be specified\n");
 }
 
 static gboolean display_warnings;
@@ -1835,7 +1836,6 @@ void kernel_shark(int argc, char **argv)
 	int clean;
 	double start = 0.0;
 	double duration = 0.0;
-	
 
 	g_thread_init(NULL);
 	gdk_threads_init();
