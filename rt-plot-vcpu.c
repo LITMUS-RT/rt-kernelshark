@@ -84,7 +84,7 @@ static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 	unsigned long long ts;
 
 	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts);
-	if (match && pid && pid == vcpu_info->run_tid && vcpu_info->run_time) {
+	if (match && pid && (pid == vcpu_info->run_tid || pid == -vcpu_info->run_tid) && vcpu_info->run_time) {
 		vcpu_info->running = TRUE;
 
 		/* Draw empty box for time spent not running a task */
@@ -312,7 +312,7 @@ rt_vcpu_plot_write_header(struct rt_plot_common *rt,
 			  struct trace_seq *s,
 			  unsigned long long time)
 {
-	int is_running, job, tid, tjob;
+	int is_running, job = 0, tid, tjob;
 	unsigned long long release, deadline;
 	struct vcpu_info *vcpu_info = (struct vcpu_info*)rt;
 	struct record *record;

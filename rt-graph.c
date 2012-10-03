@@ -484,8 +484,8 @@ int rt_graph_check_task_block(struct graph_info *ginfo,
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
-		dprintf(3, "Read task_block (%d) record on %d for task %d\n",
-			id, *lid, *pid);
+		dprintf(3, "Read task_block (%d) record on %d for task %d at %llu\n",
+			id, *lid, *pid, *ts);
 	}
  out:
 	return ret;
@@ -524,13 +524,12 @@ int rt_graph_check_task_resume(struct graph_info *ginfo,
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
-		dprintf(3, "Read task_resume (%d) record on %d for task %d\n",
-			id, *lid, *pid);
+		dprintf(3, "Read task_resume (%d) record on %d for task %d at %llu\n",
+			id, *lid, *pid, *ts);
 	}
  out:
 	return ret;
 }
-
 
 /**
  * rt_graph_check_sys_release - check for system release record
