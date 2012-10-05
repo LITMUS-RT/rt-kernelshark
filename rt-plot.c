@@ -28,15 +28,15 @@ void insert_record(struct graph_info *ginfo, struct record_list *list,
 
 	while (pos->next) {
 		unsigned long long next_rts = get_rts(ginfo, pos->next->record);
-		if (( reverse && !next_rts > get_rts(ginfo, record)) ||
-		    (!reverse &&  next_rts < get_rts(ginfo, record))){
+		if (( reverse &&  next_rts < get_rts(ginfo, record)) ||
+		    (!reverse &&  next_rts > get_rts(ginfo, record))){
 			break;
 		}
 		pos = pos->next;
 	}
 
 	node->next = pos->next;
-	pos->next = node;	
+	pos->next = node;
 }
 
 
@@ -53,7 +53,7 @@ int pop_record(struct graph_info *ginfo, struct record_list *list,
 	list->next = list->next->next;
 	(*node)->next = 0;
 
-	return 1;	
+	return 1;
 }
 
 
@@ -91,7 +91,7 @@ prev_release_iterator(struct graph_info *ginfo, struct record *rec, void *data)
 		*(args->out_job) = job;
 		*(args->out_release) = release;
 		*(args->out_deadline) = deadline;
-		
+
 		/* Cache to minimize work later */
 		args->common->last_job.no = job;
 		args->common->last_job.release = release;
@@ -122,14 +122,14 @@ prev_display_iterator(struct graph_info *ginfo, struct record *record, void *dat
 	if (get_rts(ginfo, record) < args->min_ts) {
 		return 0;
 	}
-		
+
 	eid = pevent_data_type(ginfo->pevent, record);
 	ignored = (eid == ginfo->event_sched_switch_id);
 
 	if (!ignored) {
 		ignored = args->common->is_drawn(ginfo, eid);
 	}
-	
+
 	if (!ignored && args->common->record_matches(args->common, ginfo, record)) {
 		args->result = record;
 		++record->ref_count;
@@ -147,8 +147,6 @@ static struct record*
 find_prev_display_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
 		 unsigned long long time, unsigned long long range)
 {
-	int eid, ignored, match, cpu;
-	struct record *prev, *next, *res = NULL;
 	struct prev_display_args args = {rt_info, NULL, 0};
 
 	if (range) {
@@ -342,98 +340,64 @@ rt_plot_match_time(struct graph_info *ginfo, struct graph_plot *plot,
 	return ret;
 }
 
-
-
 /**
- * next_rts - find a real-time timestamp AROUND an FTRACE time
- * @ginfo: Current state of the graph
- * @cpu: CPU to search
- * @ft_target: FTRACE time to seek towards
- *
- * Returns the RT time of a record CLOSELY BEFORE @ft_time.
- */
-unsigned long long
-next_rts(struct graph_info *ginfo, int cpu, unsigned long long ft_target)
-{
-	struct record *record;
-	unsigned long long ts = 0ULL;
-	tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, ft_target);
-	record = tracecmd_read_data(ginfo->handle, cpu);
-	if (record) {
-		ts = get_rts(ginfo, record);
-		free_record(record);
-		return ts;
-	} else
-		return 0;
-}
-
-/**
- * set_cpu_to_rts - seek CPU to a time closely preceding a real-time timestamp
- * @ginfo: Current state o the graph
+ * set_cpu_to_rts - seek CPU to a time closely preceding a real-time timestamp.
  * @cpu: The CPU to seek
  * @rt_target: RT time to seek towards
  *
  * This seeks to a real-time timestamp, not the default ftrace timestamps.
- * The @cpu seek location will be placed before the given time, but will
- * not necessarily be placed _right_ before the time.
+ * The @cpu seek location will be placed on the last record whose timestamp
+ * is less than @rt_target.
  */
-unsigned long long
-set_cpu_to_rts(struct graph_info *ginfo, unsigned long long rt_target, int cpu)
+long long correction = 0;
+unsigned long long set_cpu_to_rts(struct graph_info *ginfo,
+		    unsigned long long rt_target, int cpu)
 {
-	struct record *record;
-	unsigned long long last_rts, rts, seek_time, last_seek;
-	long long diff;
+	struct record *record, *last_record;
+	unsigned long long rts, seek_time;
+	long long next_diff;
 
-	rts = next_rts(ginfo, cpu, rt_target);
-	diff = rt_target - rts;
+	seek_time = rt_target + correction;
+	tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, seek_time);
 
-	/* "Guess" a new target based on difference */
-	seek_time = rt_target + diff;
-	rts = next_rts(ginfo, cpu, seek_time);
-	diff = rt_target - rts;
-
-	/* Zero in in 1.5x the difference increments */
-	if (rts && diff > 0) {
-		/*   rts      rt_target  | real-time time
-		 *   seek        ?       | trace-cmd time
-		 * ---|---->>----|--------
-		 */
-		do {
-			last_seek = seek_time;
-			last_rts = rts;
-			seek_time = seek_time + 1.5 * (rt_target - rts);
-			rts = next_rts(ginfo, cpu, seek_time);
-		} while (rts < rt_target && last_rts != rts);
-		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, last_seek);
-		seek_time = last_seek;
-	} else if (rts && diff < 0) {
-		/* rt_target    rts      | real-time time
-		 *    ?         seek     | trace-cmd time
-		 * ---|----<<----|--------
-		 */
-		do {
-			seek_time = seek_time - 1.5 * (rts - rt_target);
-			last_rts = rts;
-			rts = next_rts(ginfo, cpu, seek_time);
-		} while (rts > rt_target && rts != last_rts);
+	last_record = tracecmd_read_data(ginfo->handle, cpu);
+	rts = get_rts(ginfo, last_record);
+	if (rts < rt_target) {
+		while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
+			if (get_rts(ginfo, record) >= rt_target) {
+				free_record(record);
+					break;
+			}
+			free_record(last_record);
+			last_record = record;
+		}
+	} else if (rts > rt_target) {
+		while ((record = tracecmd_read_prev(ginfo->handle, last_record))) {
+			if (get_rts(ginfo, record) <= rt_target) {
+				free_record(last_record);
+				last_record = record;
+				break;
+			}
+			free_record(last_record);
+			last_record = record;
+		}
 	}
 
-	/* Get to first record at or after time */
-	while ((record = tracecmd_read_data(ginfo->handle, cpu))) {
-		if (get_rts(ginfo, record) >= rt_target)
-			break;
-		free_record(record);
+	if (last_record) {
+		next_diff = (last_record->ts - rt_target);
+		if (correction)
+			correction = correction *3/ 4 + (next_diff) / 4;
+		else
+			correction = next_diff;
+		tracecmd_set_cursor(ginfo->handle, cpu, last_record->offset);
+		free_record(last_record);
 	}
-	if (record) {
-		tracecmd_set_cursor(ginfo->handle, cpu, record->offset);
-		free_record(record);
-	} else
-		tracecmd_set_cpu_to_timestamp(ginfo->handle, cpu, seek_time);
+
 	return rts;
 }
 
 /**
- * set_cpus_to_time - seek all cpus to real-time @rt_target
+ * set_cpus_to_time - seek all cpus to real-time @rt_target.
  */
 unsigned long long set_cpus_to_rts(struct graph_info *ginfo, unsigned long long rt_target)
 {
@@ -491,6 +455,9 @@ int is_task_running(struct graph_info *ginfo,
 	return running;
 }
 
+/**
+ * iterate - pass records in real-time timestamp order to @cb.
+ */
 void iterate(struct graph_info *ginfo, int reverse, iterate_cb cb, void *data)
 {
 	int proceed, cpu;
@@ -502,47 +469,48 @@ void iterate(struct graph_info *ginfo, int reverse, iterate_cb cb, void *data)
 	memset(nodes, 0, sizeof(*nodes) * ginfo->cpus);
 	memset(&list, 0, sizeof(list));
 
-	/* Maintains a list of the next record on each cpu, sorted by
-	 * timestamp. Start with the first record on each cpu.
-	 */
+	/* Start with the first record on each CPU */
 	for (cpu = 0; cpu < ginfo->cpus; cpu++) {
 		next = tracecmd_peek_data(ginfo->handle, cpu);
 		if (next) {
 			if (reverse) {
+				/* Reading backwards is clumsy...*/
 				prev = next;
-				next = tracecmd_read_prev(ginfo->handle, prev);
-				if (prev != next && prev->data) {
-					free_record(prev);
-				}
+			 	next = tracecmd_read_prev(ginfo->handle, prev);
+			 	if (prev != next && prev->data)
+			 		free_record(prev);
+			} else {
+				next = tracecmd_read_data(ginfo->handle, cpu);
 			}
 			insert_record(ginfo, &list, next, &nodes[cpu], reverse);
 		}
 	}
 
-	/* Read sequentially from all cpus */
+	/* Read record with the next timestamp until the callback is finished
+	 * consuming data
+	 */
 	while (pop_record(ginfo, &list, &node)) {
 		next = node->record;
 
+		/* Pass records into callback */
 		proceed = cb(ginfo, next, data);
-
 		if (!proceed) {
 			free_record(next);
 			break;
-		} 
-
-		prev = next;
-
-		if (!reverse) {
-			next = tracecmd_read_data(ginfo->handle, next->cpu);
-		} else {
-			next = tracecmd_read_prev(ginfo->handle, next);
 		}
 
+		/* Replace this record with the next record from the same CPU */
+		prev = next;
+		if (!reverse)
+			next = tracecmd_read_data(ginfo->handle, next->cpu);
+		else
+			next = tracecmd_read_prev(ginfo->handle, next);
 		free_record(prev);
-
-		insert_record(ginfo, &list, next, node, reverse);
+		if (prev != next)
+			insert_record(ginfo, &list, next, node, reverse);
 	}
 
+	/* Free unused records */
 	while (pop_record(ginfo, &list, &node)) {
 		free_record(node->record);
 	}
@@ -550,7 +518,7 @@ void iterate(struct graph_info *ginfo, int reverse, iterate_cb cb, void *data)
 
 
 /**
- * Find the information for the last release of @match_tid on @cpu before @time.
+ * get_previous_release - return stats for the latest release of @match_tid
  *
  * This method will NOT re-seek the CPUs near time. The caller must have placed
  * the CPUs near the the CPUs themselves.

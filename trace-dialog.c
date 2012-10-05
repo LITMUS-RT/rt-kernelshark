@@ -183,7 +183,6 @@ void warning(const char *fmt, ...)
 {
 	GString *str;
 	va_list ap;
-	int err;
 
 	if (alt_warning) {
 		va_start(ap, fmt);
@@ -199,7 +198,6 @@ void warning(const char *fmt, ...)
 		return;
 	}
 
-	err = errno;
 	errno = 0;
 
 	str = g_string_new("");

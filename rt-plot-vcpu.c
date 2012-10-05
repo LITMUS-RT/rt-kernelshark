@@ -13,12 +13,12 @@
 #define dprintf(l, x...)	do { if (0) printf(x); } while (0)
 #endif
 
-static void update_tid(struct vcpu_info *info, int tid)
+static void update_label(struct vcpu_info *info, int tid, int tjob)
 {
 	info->fresh = FALSE;
 	if (tid != info->run_tid) {
 		info->run_tid = tid;
-		snprintf(info->label, LLABEL, "%d", tid);
+		snprintf(info->label, LLABEL, "%d:%d", tid, tjob);
 	}
 }
 
@@ -33,7 +33,7 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 						  &sid, &job,
 						  &tid, &tjob, &ts);
 	if (match && sid == vcpu_info->sid) {
-		update_tid(vcpu_info, tid);
+		update_label(vcpu_info, tid, tjob);
 
 		if (vcpu_info->run_time && vcpu_info->run_time < ts) {
 			info->box = TRUE;
@@ -66,7 +66,7 @@ static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu
 	match = rt_graph_check_server_switch_to(ginfo, record,
 						&sid, &job, &tid, &tjob, &ts);
 	if (match && sid == vcpu_info->sid) {
-		update_tid(vcpu_info, tid);
+		update_label(vcpu_info, tid, tjob);
 		vcpu_info->run_time = ts;
 		vcpu_info->run_cpu = record->cpu;
 		vcpu_info->run_tid = tid;
@@ -151,7 +151,7 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 					     &release, &deadline,
 					     &job, &tid, &tjob, &record);
 		if (is_running) {
-			update_tid(vcpu_info, tid);
+			update_label(vcpu_info, tid, tjob);
 			info->box = TRUE;
 			info->bcolor = hash_pid(vcpu_info->run_tid);
 			info->bfill = is_task_running(ginfo, ginfo->view_end_time, tid);
@@ -251,7 +251,7 @@ void rt_vcpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 	vcpu_info->fresh = TRUE;
 	vcpu_info->running = FALSE;
 	vcpu_info->last_job = -1;
-	update_tid(vcpu_info, 0);
+	update_label(vcpu_info, 0, 0);
 }
 
 /**
@@ -276,15 +276,15 @@ int rt_vcpu_plot_record_matches(struct rt_plot_common *rt,
 	int dint, sid, match;
 	unsigned long long dull;
 
-#define ARG ginfo, record, &sid
-	match = rt_graph_check_server_switch_to(ARG, &dint, &dint, &dint, &dull)   ||
-		rt_graph_check_server_switch_away(ARG, &dint, &dint, &dint, &dull);
-		/* rt_graph_check_server_completion(ARG, &dint, &dull)  || */
-		/* rt_graph_check_server_release(ARG, &dint, &dull, &dull); */
-		/* rt_graph_check_server_block(ARG, &dull)		    || */
-		/* rt_graph_check_server_resume(ARG, &dull); */
+#define ARG ginfo, record, &sid, &dint
+	match = rt_graph_check_server_switch_to(ARG, &dint, &dint, &dull)   ||
+		rt_graph_check_server_switch_away(ARG,&dint, &dint, &dull);
+		rt_graph_check_server_completion(ARG, &dull)  ||
+		rt_graph_check_server_release(ARG, &dull, &dull);
+		rt_graph_check_server_block(ARG, &dull)		    ||
+		rt_graph_check_server_resume(ARG, &dull);
 #undef ARG
-	return (sid == vcpu_info->sid);
+	return (match && sid == vcpu_info->sid);
 }
 
 /**

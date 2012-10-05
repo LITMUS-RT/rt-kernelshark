@@ -1852,14 +1852,16 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 }
 
 /*
- * TODO: this method needs refactoring and splitting
+ * TODO: this method needs refactoring and splitting.
+ * Containers currently aren't using hashing, which can significantly affect
+ * performance if enough containers are being rendered.
  */
 static void draw_hashed_plots(struct graph_info *ginfo)
 {
 	gint cpu, pid, clean;
 	struct record *record;
-	struct plot_hash *hash;
 	struct plot_list *list;
+	struct plot_hash *hash;
 	unsigned long long max_time, min_time;
 	gdouble start, duration;
 
@@ -1940,19 +1942,19 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 		}
 
 
-		/* hash = trace_graph_plot_find_cpu(ginfo, cpu); */
-		/* if (hash) { */
-		/* 	for (list = hash->plots; list; list = list->next) { */
-		/* 		draw_plot(ginfo, list->plot, record); */
-		/* 	} */
-		/* } */
-		/* pid = pevent_data_pid(ginfo->pevent, record); */
-		/* hash = trace_graph_plot_find_task(ginfo, pid); */
-		/* if (hash) { */
-		/* 	for (list = hash->plots; list; list = list->next) { */
-		/* 		draw_plot(ginfo, list->plot, record); */
-		/* 	} */
-		/* } */
+		hash = trace_graph_plot_find_cpu(ginfo, cpu);
+		if (hash) {
+			for (list = hash->plots; list; list = list->next) {
+				draw_plot(ginfo, list->plot, record);
+			}
+		}
+		pid = pevent_data_pid(ginfo->pevent, record);
+		hash = trace_graph_plot_find_task(ginfo, pid);
+		if (hash) {
+			for (list = hash->plots; list; list = list->next) {
+				draw_plot(ginfo, list->plot, record);
+			}
+		}
 		for (list = ginfo->all_recs; list; list = list->next) {
 			/* TODO: hacky assumption that everything else can be
 			 * reached via previous hashes
@@ -1960,10 +1962,10 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			 * added with arbitrary numbers, and a pevent_other_id
 			 * which uses id ranges x < . < y to parse cids or lids
 			 */
-			/* if (list->plot->type == PLOT_TYPE_SERVER_TASK || */
-			/*     list->plot->type == PLOT_TYPE_SERVER_CPU) { */
+			if (list->plot->type == PLOT_TYPE_SERVER_TASK ||
+			    list->plot->type == PLOT_TYPE_SERVER_CPU) {
 				draw_plot(ginfo, list->plot, record);
-			/* } */
+			}
 		}
 		free_record(record);
 	}

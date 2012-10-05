@@ -68,7 +68,7 @@ find_rt_display_record(struct graph_info *ginfo,
 	return __find_rt_record(ginfo, rt, time, 1, 0);
 }
 
-unsigned long long next_rts(struct graph_info *ginfo, int cpu,
+long long next_rts(struct graph_info *ginfo, int cpu,
 			    unsigned long long ft_target);
 unsigned long long set_cpu_to_rts(struct graph_info *ginfo,
 		    unsigned long long rt_target, int cpu);
