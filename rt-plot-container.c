@@ -63,9 +63,15 @@ struct server_iter_args {
 	int is_running;
 };
 
+static inline void try_job_update(struct server_iter_args *args, int candidate)
+{
+	if (!(*args->out_job))
+		(*args->out_job) = candidate;
+}
+
 static int server_iterator(struct graph_info *ginfo, struct record *record, void *data)
 {
-	int sid, job, tid, tjob, match;
+	int sid, job, tid, tjob, match, ret;
 	struct server_iter_args *args = data;
 	unsigned long long when, time = get_rts(ginfo, record);
 
@@ -77,19 +83,26 @@ static int server_iterator(struct graph_info *ginfo, struct record *record, void
 #define ARGS ginfo, record, &sid, &job, &tid, &tjob, &when
 	match = rt_graph_check_server_switch_away(ARGS);
 	if (match && sid == args->match_sid) {
+		/* We were running something */
 		(*args->out_tid)  = tid;
 		(*args->out_tjob) = tjob;
-		(*args->out_job)  = job;
+		try_job_update(args, job);
 		args->is_running = 1;
-		return 0;
+		ret = 0;
 
+	} else if (match && tid == args->match_sid) {
+		/* We are being run by someone */
+		try_job_update(args, tjob);
 	}
 
 	match = rt_graph_check_server_switch_to(ARGS);
 	if (match && sid == args->match_sid) {
 		/* We must not have been running anything */
-		(*args->out_job) = job;
+		try_job_update(args, job);
 		return 0;
+	} else if (match && tid == args->match_sid) {
+		/* We are being run by someone */
+		try_job_update(args, tjob);
 	}
 
 #undef  ARGS
@@ -98,8 +111,6 @@ static int server_iterator(struct graph_info *ginfo, struct record *record, void
 
 int get_server_info(struct graph_info *ginfo, struct rt_plot_common *rt,
 		    int match_sid, unsigned long long time,
-		    unsigned long long *out_release,
-		    unsigned long long *out_deadline,
 		    int *out_job, int *out_tid, int *out_tjob,
 		    struct record **out_record)
 {
@@ -110,7 +121,7 @@ int get_server_info(struct graph_info *ginfo, struct rt_plot_common *rt,
 	if (!*out_record)
 		return 0;
 
-	*out_release = *out_deadline = *out_job = *out_tid = 0;
+	*out_tjob = *out_job = *out_tid = 0;
 
 	set_cpus_to_rts(ginfo, time);
 	iterate(ginfo, 0, server_iterator, &args);
@@ -136,8 +147,8 @@ void rt_plot_container(struct graph_info *ginfo, int cid)
 
 	for (vlist = cont->vcpus; vlist; vlist = vlist->next) {
 		insert_vcpu(ginfo, cont, vlist);
-		if (vlist->params.wcet && vlist->params.period)
-			insert_vtask(ginfo, cont, vlist);
+		/* if (vlist->params.wcet && vlist->params.period) */
+		/* 	insert_vtask(ginfo, cont, vlist); */
 	}
 }
 

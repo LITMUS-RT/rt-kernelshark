@@ -345,16 +345,7 @@ int trace_graph_plot_event(struct graph_info *ginfo,
 			   struct record *record,
 			   struct plot_info *info)
 {
-	info->line = FALSE;
-	info->box = FALSE;
-	info->bfill = TRUE;
-	info->lsmall = FALSE;
-
-	info->blabel = NULL;
-	info->bthin = FALSE;
-	info->release = FALSE;
-	info->deadline = FALSE;
-	info->completion = FALSE;
+	memset(info,0, sizeof(*info));
 
 	if (!plot->cb->plot_event)
 		return 0;

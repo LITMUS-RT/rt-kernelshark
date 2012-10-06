@@ -88,6 +88,9 @@ struct plot_info {
 	gboolean		dbox;
 	unsigned long long	dbtime;
 	char			*dblabel;
+
+	gboolean		flip;
+	gboolean		repeat;
 };
 
 /*

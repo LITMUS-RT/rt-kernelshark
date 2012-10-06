@@ -300,7 +300,7 @@ TRACE_CMD_OBJS = trace-cmd.o trace-record.o trace-read.o trace-split.o trace-lis
 	 trace-stack.o trace-options.o
 TRACE_VIEW_OBJS = trace-view.o trace-view-store.o
 RT_GRAPH_OBJS = rt-graph.o rt-plot-task.o rt-plot-cpu.o rt-plot-container.o rt-plot.o \
-	rt-plot-vcpu.o rt-plot-vtask.o
+	rt-plot-vcpu.o
 TRACE_GRAPH_OBJS = trace-graph.o trace-plot.o \
 	trace-plot-cpu.o trace-plot-task.o \
 	$(RT_GRAPH_OBJS) task-list.o

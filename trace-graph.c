@@ -1672,7 +1672,7 @@ static void draw_plot_label(struct graph_info *ginfo, char *label,
 static void draw_plot_box(struct graph_info *ginfo, int i,
 			  unsigned long long start,
 			  unsigned long long end,
-			  gboolean fill, gboolean thin,
+			  gboolean fill, gboolean thin, gboolean flip,
 			  char *label, GdkGC *gc)
 {
 	gint x1, x2, y, size;
@@ -1681,7 +1681,12 @@ static void draw_plot_box(struct graph_info *ginfo, int i,
 	x2 = convert_time_to_x(ginfo, end);
 
 	size = (thin) ? PLOT_BOX_SIZE/4 : PLOT_BOX_SIZE;
-	y = PLOT_BOX_TOP(i) + (PLOT_BOX_SIZE - size)/2;
+	if (!flip)
+		y = PLOT_BOX_TOP(i);
+	else
+		y = PLOT_BOX_TOP(i) - PLOT_BOX_SIZE;
+
+	y += (PLOT_BOX_SIZE - size)/2;
 
 	gdk_draw_rectangle(ginfo->curr_pixmap, gc,
 			   fill,
@@ -1784,71 +1789,74 @@ static void draw_plot(struct graph_info *ginfo, struct graph_plot *plot,
 		g_object_unref(layout);
 	}
 
-	trace_graph_plot_event(ginfo, plot, record, &info);
+	do {
+		trace_graph_plot_event(ginfo, plot, record, &info);
 
-	if (info.box) {
-		if (info.bcolor != plot->last_color) {
-			plot->last_color = info.bcolor;
-			set_color(ginfo->draw, plot->gc, plot->last_color);
+		if (info.box) {
+			if (info.bcolor != plot->last_color) {
+				plot->last_color = info.bcolor;
+				set_color(ginfo->draw, plot->gc, plot->last_color);
+			}
+
+			draw_plot_box(ginfo, plot->pos, info.bstart, info.bend,
+				      info.bfill, info.bthin, info.flip,
+				      info.blabel, plot->gc);
 		}
 
-		draw_plot_box(ginfo, plot->pos, info.bstart, info.bend,
-		 	      info.bfill, info.bthin, info.blabel, plot->gc);
-	}
-
-	if (info.release && is_high_res(ginfo)) {
-		if (plot->last_color != 0) {
-			plot->last_color = 0;
-			set_color(ginfo->draw, plot->gc, plot->last_color);
-		}
-		draw_plot_release(ginfo, plot->pos, info.rtime, plot->gc);
-	}
-
-	if (info.deadline && is_high_res(ginfo)) {
-		if (plot->last_color != 0) {
-			plot->last_color = 0;
-			set_color(ginfo->draw, plot->gc, plot->last_color);
-		}
-		draw_plot_deadline(ginfo, plot->pos, info.dtime, plot->gc);
-	}
-
-	if (info.completion && is_high_res(ginfo)) {
-		if (plot->last_color != 0) {
-			plot->last_color = 0;
-			set_color(ginfo->draw, plot->gc, plot->last_color);
-		}
-		draw_plot_completion(ginfo, plot->pos, info.ctime, plot->gc);
-	}
-
-
-	if (info.line) {
-		if (info.lcolor != plot->last_color) {
-			plot->last_color = info.lcolor;
-			set_color(ginfo->draw, plot->gc, plot->last_color);
+		if (info.release && is_high_res(ginfo)) {
+			if (plot->last_color != 0) {
+				plot->last_color = 0;
+				set_color(ginfo->draw, plot->gc, plot->last_color);
+			}
+			draw_plot_release(ginfo, plot->pos, info.rtime, plot->gc);
 		}
 
-		x = draw_plot_line(ginfo, plot->pos, info.ltime, info.lsmall, plot->gc);
+		if (info.deadline && is_high_res(ginfo)) {
+			if (plot->last_color != 0) {
+				plot->last_color = 0;
+				set_color(ginfo->draw, plot->gc, plot->last_color);
+			}
+			draw_plot_deadline(ginfo, plot->pos, info.dtime, plot->gc);
+		}
 
-		/* Figure out if we can show the text for the previous record */
+		if (info.completion && is_high_res(ginfo)) {
+			if (plot->last_color != 0) {
+				plot->last_color = 0;
+				set_color(ginfo->draw, plot->gc, plot->last_color);
+			}
+			draw_plot_completion(ginfo, plot->pos, info.ctime, plot->gc);
+		}
 
-		plot->p3 = x;
 
-		/* Make sure p2 will be non-zero the next iteration */
-		if (!plot->p3)
-			plot->p3 = 1;
+		if (info.line) {
+			if (info.lcolor != plot->last_color) {
+				plot->last_color = info.lcolor;
+				set_color(ginfo->draw, plot->gc, plot->last_color);
+			}
 
-		/* first record, continue */
-		if (plot->p2)
-			plot->p2 = draw_event_label(ginfo, plot->pos,
-						    plot->p1, plot->p2, plot->p3, width_16, font);
+			x = draw_plot_line(ginfo, plot->pos, info.ltime, info.lsmall, plot->gc);
 
-		plot->p1 = plot->p2;
-		plot->p2 = plot->p3;
-	}
+			/* Figure out if we can show the text for the previous record */
 
-	if (!record && plot->p2)
-		draw_event_label(ginfo, plot->pos,
-				 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
+			plot->p3 = x;
+
+			/* Make sure p2 will be non-zero the next iteration */
+			if (!plot->p3)
+				plot->p3 = 1;
+
+			/* first record, continue */
+			if (plot->p2)
+				plot->p2 = draw_event_label(ginfo, plot->pos,
+							    plot->p1, plot->p2, plot->p3, width_16, font);
+
+			plot->p1 = plot->p2;
+			plot->p2 = plot->p3;
+		}
+
+		if (!record && plot->p2)
+			draw_event_label(ginfo, plot->pos,
+					 plot->p1, plot->p2, ginfo->draw_width, width_16, font);
+	} while (info.repeat);
 }
 
 /*

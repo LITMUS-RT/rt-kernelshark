@@ -2,7 +2,6 @@
 #define __RT_PLOT_CONTAINER_H
 
 #include "rt-plot-vcpu.h"
-#include "rt-plot-vtask.h"
 
 typedef void (*cont_dialog_cb_func)(gboolean, gint*, gint*, gpointer);
 
@@ -16,7 +15,6 @@ void rt_plot_add_all_containers(struct graph_info *ginfo);
 int get_server_info(struct graph_info *ginfo,
 		    struct rt_plot_common *rt,
 		    int match_sid, unsigned long long time,
-		    unsigned long long *release, unsigned long long *deadline,
 		    int *job, int *tid, int *tjob, struct record **record);
 
 #endif
