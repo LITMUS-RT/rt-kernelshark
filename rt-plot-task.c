@@ -678,7 +678,7 @@ void rt_plot_task(struct graph_info *ginfo, int pid, int pos)
 void rt_plot_add_all_tasks(struct graph_info *ginfo)
  {
 	gint *tasks;
-	int i, j, len, tmp;
+	int i, j, tmp;
 	tasks = task_list_pids(ginfo->rtg_info.tasks);
 
 	/* Awful sort */

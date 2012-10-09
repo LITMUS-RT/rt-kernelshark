@@ -145,11 +145,8 @@ void rt_plot_container(struct graph_info *ginfo, int cid)
 
 	cont->plotted = TRUE;
 
-	for (vlist = cont->vcpus; vlist; vlist = vlist->next) {
+	for (vlist = cont->vcpus; vlist; vlist = vlist->next)
 		insert_vcpu(ginfo, cont, vlist);
-		/* if (vlist->params.wcet && vlist->params.period) */
-		/* 	insert_vtask(ginfo, cont, vlist); */
-	}
 }
 
 void rt_plot_add_all_containers(struct graph_info *ginfo)

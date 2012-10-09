@@ -1949,31 +1949,30 @@ static void draw_hashed_plots(struct graph_info *ginfo)
 			continue;
 		}
 
-
-		hash = trace_graph_plot_find_cpu(ginfo, cpu);
-		if (hash) {
-			for (list = hash->plots; list; list = list->next) {
-				draw_plot(ginfo, list->plot, record);
-			}
-		}
-		pid = pevent_data_pid(ginfo->pevent, record);
-		hash = trace_graph_plot_find_task(ginfo, pid);
-		if (hash) {
-			for (list = hash->plots; list; list = list->next) {
-				draw_plot(ginfo, list->plot, record);
-			}
-		}
+		/* hash = trace_graph_plot_find_cpu(ginfo, cpu); */
+		/* if (hash) { */
+		/* 	for (list = hash->plots; list; list = list->next) { */
+		/* 		draw_plot(ginfo, list->plot, record); */
+		/* 	} */
+		/* } */
+		/* pid = pevent_data_pid(ginfo->pevent, record); */
+		/* hash = trace_graph_plot_find_task(ginfo, pid); */
+		/* if (hash) { */
+		/* 	for (list = hash->plots; list; list = list->next) { */
+		/* 		draw_plot(ginfo, list->plot, record); */
+		/* 	} */
+		/* } */
 		for (list = ginfo->all_recs; list; list = list->next) {
-			/* TODO: hacky assumption that everything else can be
-			 * reached via previous hashes
-			 * Should be an additional hashed list where things are
-			 * added with arbitrary numbers, and a pevent_other_id
-			 * which uses id ranges x < . < y to parse cids or lids
-			 */
-			if (list->plot->type == PLOT_TYPE_SERVER_TASK ||
-			    list->plot->type == PLOT_TYPE_SERVER_CPU) {
+			/* /\* TODO: hacky assumption that everything else can be */
+			/*  * reached via previous hashes */
+			/*  * Should be an additional hashed list where things are */
+			/*  * added with arbitrary numbers, and a pevent_other_id */
+			/*  * which uses id ranges x < . < y to parse cids or lids */
+			/*  *\/ */
+			/* if (list->plot->type == PLOT_TYPE_SERVER_TASK || */
+			/*     list->plot->type == PLOT_TYPE_SERVER_CPU) { */
 				draw_plot(ginfo, list->plot, record);
-			}
+			/* } */
 		}
 		free_record(record);
 	}

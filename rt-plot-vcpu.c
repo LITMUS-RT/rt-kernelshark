@@ -165,7 +165,8 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 	unsigned long long ts;
 
 	match = rt_graph_check_switch_away(ginfo, record, &pid, &job, &ts);
-	if (match && pid && pid == vcpu_info->task_tid && vcpu_info->task_running) {
+	if (match && pid && vcpu_info->task_running &&
+	    (pid == vcpu_info->task_tid || pid == -vcpu_info->task_tid)) {
 		update_task_label(vcpu_info, pid, job);
 
 		/* This server is no longer running a real task */
@@ -427,21 +428,20 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 
 	g_assert(cont);
 
-
 	len = strlen(cont->name) + 100;
 	label = malloc_or_die(len);
 
 	if (vcpu_info->params.wcet) {
 		vcpu->show_server = TRUE;
-		snprintf(label, len, "%s - %d\nServer %d\n(%1.1f, %1.1f)",
-			 cont->name, cont->cid, vcpu_info->sid,
+		snprintf(label, len, "%s-%d\n(%1.1f, %1.1f)",
+			 cont->name, -vcpu_info->sid,
 			 nano_as_milli(vcpu_info->params.wcet),
 			 nano_as_milli(vcpu_info->params.period));
 	} else {
 		/* Always running, no need to see the server */
 		vcpu->show_server = FALSE;
-		snprintf(label, len, "%s - %d\nServer %d",
-			 cont->name, cont->cid, vcpu_info->sid);
+		snprintf(label, len, "%s-%d",
+			 cont->name, -vcpu_info->sid);
 	}
 
 	plot = trace_graph_plot_append(ginfo, label, PLOT_TYPE_SERVER_CPU,
