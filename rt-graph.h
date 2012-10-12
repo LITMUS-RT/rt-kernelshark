@@ -105,11 +105,9 @@ struct rt_graph_info {
 
 	gint 			server_block_id;
 	struct format_field 	*sblock_sid_field;
-	struct format_field 	*sblock_lid_field;
 
 	gint 			server_resume_id;
 	struct format_field 	*sresume_sid_field;
-	struct format_field 	*sresume_lid_field;
 
 	/* Cache of ts fields for non-litmus events */
 	struct ts_list		*events[TS_HASH_SIZE];
@@ -206,10 +204,10 @@ int rt_graph_check_server_completion(struct graph_info *ginfo,
 				     gint *sid, gint *job,
 				     unsigned long long *when);
 int rt_graph_check_server_block(struct graph_info *ginfo,
-				struct record *record, gint *pid, gint *lid,
+				struct record *record, gint *pid,
 				unsigned long long *when);
 int rt_graph_check_server_resume(struct graph_info *ginfo, struct record *record,
-				 gint *pid, gint *lid, unsigned long long *when);
+				 gint *pid, unsigned long long *when);
 int rt_graph_check_sys_release(struct graph_info *ginfo, struct record *record,
 			       unsigned long long *when);
 void init_rt_event_cache(struct rt_graph_info *rtinfo);

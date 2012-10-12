@@ -386,28 +386,32 @@ rt_cpu_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot
 	unsigned long long offset;
 	int eid, cpu;
 
-	cpu = rtc_info->cpu;
-	record = tracecmd_peek_data(ginfo->handle, cpu);
-	if (record)
-		offset = record->offset;
+	/* TODO: disabled */
+	return 0;
 
-	record = find_display_record(ginfo, cpu, time);
+	/* cpu = rtc_info->cpu; */
+	/* record = tracecmd_peek_data(ginfo->handle, cpu); */
+	/* if (record) */
+	/* 	offset = record->offset; */
 
-	if (offset)
-		tracecmd_set_cursor(ginfo->handle, cpu, offset);
-	if (!record)
-		return 0;
+	/* record = find_display_record(ginfo, cpu, time); */
 
-	eid = pevent_data_type(ginfo->pevent, record);
-	event = pevent_data_event_from_type(ginfo->pevent, eid);
-	if (event) {
-		trace_seq_puts(s, event->name);
-		trace_seq_printf(s, "\n"); /* Doesn't work otherwise */
-	} else
-		trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
-	free_record(record);
+	/* if (offset) */
+	/* 	tracecmd_set_cursor(ginfo->handle, cpu, offset); */
+	/* if (!record) */
+	/* 	return 0; */
 
-	return 1;
+
+	/* eid = pevent_data_type(ginfo->pevent, record); */
+	/* event = pevent_data_event_from_type(ginfo->pevent, eid); */
+	/* if (event) { */
+	/* 	trace_seq_puts(s, event->name); */
+	/* 	trace_seq_printf(s, "\n"); /\* Doesn't work otherwise *\/ */
+	/* } else */
+	/* 	trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid); */
+	/* free_record(record); */
+
+	/* return 1; */
 }
 
 struct record*

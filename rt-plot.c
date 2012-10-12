@@ -211,25 +211,26 @@ rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
 	struct offset_cache *offsets;
 	struct rt_plot_common *rt_info = plot->private;
 
-	offsets = save_offsets(ginfo);
+	return 0;
+	/* offsets = save_offsets(ginfo); */
 
-	record = find_rt_display_record(ginfo, rt_info, time);
+	/* record = find_rt_display_record(ginfo, rt_info, time); */
 
-	restore_offsets(ginfo, offsets);
-	if (!record)
-		return 0;
+	/* restore_offsets(ginfo, offsets); */
+	/* if (!record) */
+	/* 	return 0; */
 
-	eid = pevent_data_type(ginfo->pevent, record);
-	event = pevent_data_event_from_type(ginfo->pevent, eid);
-	if (event)
-		trace_seq_puts(s, event->name);
-	else
-		trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid);
-	trace_seq_putc(s, '\n');
-	trace_seq_printf(s, "CPU %d\n", record->cpu);
-	free_record(record);
+	/* eid = pevent_data_type(ginfo->pevent, record); */
+	/* event = pevent_data_event_from_type(ginfo->pevent, eid); */
+	/* if (event) */
+	/* 	trace_seq_puts(s, event->name); */
+	/* else */
+	/* 	trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid); */
+	/* trace_seq_putc(s, '\n'); */
+	/* trace_seq_printf(s, "CPU %d\n", record->cpu); */
+	/* free_record(record); */
 
-	return 1;
+	/* return 1; */
 }
 
 /**

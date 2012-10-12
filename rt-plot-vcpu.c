@@ -32,6 +32,13 @@ static void update_server_label(struct vcpu_info *info, int job)
 	}
 }
 
+#define check_server(cond, vcpu, time, fmt, args...)			\
+	do {								\
+		if (!(cond)) fprintf(stderr, "%s -> %s: " fmt " at %llu\n", \
+				     vcpu->server_label,		\
+				     vcpu_info->task_label, ##args, time); \
+	} while(0)
+
 static int
 try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		struct record *record, struct plot_info *info)
@@ -48,10 +55,15 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		update_task_label(vcpu_info, tid, tjob);
 		update_server_label(vcpu_info, job);
 
+		check_server(vcpu_info->server_running, vcpu_info, ts,
+			     "switched away when server was not running");
+		check_server(vcpu_info->task_running, vcpu_info, ts,
+			     "switched away when no task was running");
+
 		if (vcpu_info->task_run_time && vcpu_info->task_run_time < ts) {
 			info->box = TRUE;
-			info->bcolor = hash_pid(tid);
-			info->bfill = vcpu_info->task_running;
+			info->bcolor = hash_pid(tid > 0 ? tid : -tid);
+			info->bfill = vcpu_info->task_exec;
 			info->bstart = vcpu_info->task_run_time;
 			info->bend = ts;
 			info->blabel = vcpu_info->task_label;
@@ -67,9 +79,17 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		/* This server is no longer running */
 		update_server_label(vcpu_info, tjob);
 
+		check_server(vcpu_info->server_running, vcpu_info, ts,
+			     "stopped running when wasn't running");
+		check_server(!vcpu_info->task_running || vcpu_info->task_cpu == NO_CPU,
+			     vcpu_info, ts, "stopped running while a task is active");
+
 		if (vcpu_info->server_run_time && vcpu_info->server_run_time < ts) {
 			info->box = TRUE;
-			info->bcolor = hash_cpu(sid - 1);
+			if (!sid)
+				info->bcolor = 0;
+			else
+				info->bcolor = hash_cpu(sid - 1);
 			info->bfill = TRUE;
 			info->bstart = vcpu_info->server_run_time;
 			info->bend = ts;
@@ -77,12 +97,13 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		}
 		vcpu_info->server_run_time = 0ULL;
 		vcpu_info->server_cpu = NO_CPU;
+		vcpu_info->server_running = FALSE;
 
 		ret = 1;
 	}
 
 	if (ret) {
-		dprintf(3, "VCPU switch away from %d on %d:%d at %llu\n",
+		dprintf(3, "VCPU Switch away tid: %d on %d:%d at %llu\n",
 			tid, sid, job, ts);
 
 		vcpu_info->task_run_time = 0ULL;
@@ -103,25 +124,40 @@ static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu
 	match = rt_graph_check_server_switch_to(ginfo, record,
 						&sid, &job, &tid, &tjob, &ts);
 	if (match && sid == vcpu_info->sid) {
+		update_server_label(vcpu_info, job);
+		check_server(!vcpu_info->task_running || vcpu_info->task_cpu == NO_CPU, vcpu_info, ts,
+			     "started running %d:%d while another task ran",
+			     tid, tjob);
+
 		/* This server is now running something */
 		update_task_label(vcpu_info, tid, tjob);
-		update_server_label(vcpu_info, job);
+
+		check_server(vcpu_info->server_running, vcpu_info, ts,
+			     "started running task without running server");
 
 		vcpu_info->task_run_time = ts;
 		vcpu_info->task_cpu = sid;
 		vcpu_info->server_cpu = record->cpu;
 		vcpu_info->task_tid = tid;
+		vcpu_info->task_running = TRUE;
 		ret = 1;
 	} else if (vcpu_info->show_server && match && tid == vcpu_info->sid) {
 		/* This server is now running */
 		update_server_label(vcpu_info, tjob);
+
+		check_server(vcpu_info->spare || !vcpu_info->server_running || vcpu_info->server_cpu == NO_CPU,
+			     vcpu_info, ts, "running server again on %d:%d, run: %d, cpu: %d", sid, job, vcpu_info->server_running, vcpu_info->server_cpu);
+
+		vcpu_info->spare = FALSE;
+
 		vcpu_info->server_run_time = ts;
 		vcpu_info->server_cpu = sid;
+		vcpu_info->server_running = TRUE;
 		ret = 1;
 	}
 
 	if (ret) {
-		dprintf(3, "Switch to %d for %d:%d at %llu\n",
+		dprintf(3, "VCPU Switch to tid: %d on %d:%d at %llu\n",
 			tid, sid, job, ts);
 	}
 
@@ -135,13 +171,13 @@ static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 	unsigned long long ts;
 
 	match = rt_graph_check_switch_to(ginfo, record, &pid, &job, &ts);
-	if (match && pid && vcpu_info->task_run_time &&
+	if (match && vcpu_info->task_run_time && pid &&
 	    (pid == vcpu_info->task_tid || pid == -vcpu_info->task_tid)) {
 		/* This server is running a physical task */
 		if (pid == vcpu_info->task_tid)
 			update_task_label(vcpu_info, pid, job);
 
-		vcpu_info->task_running = TRUE;
+		vcpu_info->task_exec = TRUE;
 
 		/* Draw empty box for time spent not running a task */
 		info->box = TRUE;
@@ -154,6 +190,14 @@ static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 
 		vcpu_info->task_run_time = ts;
 		ret = 1;
+	} else if (pid) {
+		check_server(pid != vcpu_info->sid, vcpu_info, ts,
+			     "server missing its task %d:%d, run time: %llu", pid, job, vcpu_info->task_run_time);
+	}
+
+	if (ret) {
+		dprintf(3, "VCPU Switch away on VCPU %d for %d:%d at %llu\n",
+			vcpu_info->sid, pid, job, ts);
 	}
 	return ret;
 }
@@ -165,13 +209,12 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 	unsigned long long ts;
 
 	match = rt_graph_check_switch_away(ginfo, record, &pid, &job, &ts);
-	if (match && pid && vcpu_info->task_running &&
+	if (match && pid && vcpu_info->task_exec &&
 	    (pid == vcpu_info->task_tid || pid == -vcpu_info->task_tid)) {
-		update_task_label(vcpu_info, pid, job);
+		if (pid == vcpu_info->task_tid)
+			update_task_label(vcpu_info, pid, job);
 
 		/* This server is no longer running a real task */
-		vcpu_info->task_running = FALSE;
-
 		if (vcpu_info->task_run_time && vcpu_info->task_run_time < ts) {
 			info->box = TRUE;
 			info->flip = vcpu_info->show_server;
@@ -180,9 +223,79 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 			info->bstart = vcpu_info->task_run_time;
 			info->bend = ts;
 			info->blabel = vcpu_info->task_label;
+		} else {
+			dprintf(3, "Bad run time: %llu\n", vcpu_info->task_run_time);
 		}
 
+		vcpu_info->task_exec = FALSE;
+
 		vcpu_info->task_run_time = ts;
+		ret = 1;
+	} else {
+		check_server(pid != vcpu_info->sid, vcpu_info, ts,
+			     "server missing its task switch away %d:%d, exec: %d", pid, job, vcpu_info->task_exec);
+	}
+	if (ret) {
+		dprintf(3, "Switch away on VCPU %d for %d:%d at %llu\n",
+			vcpu_info->sid, pid, job, ts);
+	}
+	return ret;
+}
+
+static int try_server_block(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
+		      struct record *record, struct plot_info *info)
+{
+	int sid, match, ret = 0;
+	unsigned long long ts;
+
+	match = rt_graph_check_server_block(ginfo, record, &sid, &ts);
+	if (match && sid == vcpu_info->sid) {
+		check_server(!vcpu_info->blocked || vcpu_info->block_cpu == NO_CPU,
+			     vcpu_info, ts, "already blocked");
+		check_server(!vcpu_info->server_running || vcpu_info->server_cpu == NO_CPU,
+			     vcpu_info, ts,
+			     "blocked before running stopped");
+
+		vcpu_info->fresh = FALSE;
+		vcpu_info->block_time = ts;
+		vcpu_info->block_cpu = record->cpu;
+		vcpu_info->blocked = TRUE;
+
+		if (!ts)
+			die("Initally no block time\n");
+
+		dprintf(3, "Server block for %d on %d at %llu\n",
+			sid, record->cpu, ts);
+		ret = 1;
+	}
+	return ret;
+}
+
+static int try_server_resume(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
+		      struct record *record, struct plot_info *info)
+{
+	int sid, match, ret = 0;
+	unsigned long long ts;
+
+	match = rt_graph_check_server_resume(ginfo, record, &sid, &ts);
+	if (match && sid == vcpu_info->sid) {
+		check_server(vcpu_info->blocked, vcpu_info, ts,
+			     "resuming when not blocked");
+
+		info->box = TRUE;
+		info->bcolor = 0x0;
+		info->bfill = TRUE;
+		info->bthin = TRUE;
+		info->bstart = vcpu_info->block_time;
+		info->bend = ts;
+
+		vcpu_info->fresh = FALSE;
+		vcpu_info->block_time = 0ULL;
+		vcpu_info->block_cpu = NO_CPU;
+		vcpu_info->blocked = FALSE;
+
+		dprintf(3, "Server resume for %d on %d at %llu\n",
+			sid, record->cpu, ts);
 		ret = 1;
 	}
 	return ret;
@@ -220,7 +333,8 @@ static int try_server_completion(struct graph_info *ginfo,
 	unsigned long long ts;
 
 	match = rt_graph_check_server_completion(ginfo, record, &sid, &job, &ts);
-	if (match && sid == vcpu_info->sid) {
+	if (match && (( vcpu_info->show_server && sid == vcpu_info->sid) ||
+		      (!vcpu_info->show_server && sid == vcpu_info->task_tid))) {
 
 		info->completion = TRUE;
 		info->ctime = ts;
@@ -229,9 +343,13 @@ static int try_server_completion(struct graph_info *ginfo,
 			sid, job, record->cpu, ts);
 		ret = 1;
 	}
+
 	return ret;
 }
 
+/*
+ * TODO: doesn't work with blocking
+ */
 static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 			struct plot_info *info)
 {
@@ -268,6 +386,22 @@ static void do_plot_end(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		info->bend = ginfo->view_end_time;
 		info->blabel = vcpu_info->server_label;
 		vcpu_info->server_run_time = 0ULL;
+		return;
+	}
+
+	if (vcpu_info->show_server && vcpu_info->block_time &&
+	    vcpu_info->block_cpu != NO_CPU) {
+		/* The server was running */
+		/* Blocking happened */
+		info->box = TRUE;
+		info->bcolor = 0x0;
+		info->bfill = TRUE;
+		info->bthin = TRUE;
+		info->bstart = vcpu_info->block_time;
+		info->bend = ginfo->view_end_time;
+		vcpu_info->fresh = FALSE;
+		vcpu_info->block_cpu = NO_CPU;
+		vcpu_info->block_time = 0ULL;
 		return;
 	}
 
@@ -308,7 +442,9 @@ static int rt_vcpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		try_server_release(ginfo, vcpu_info, record, info) ||
 		try_server_completion(ginfo, vcpu_info, record, info) ||
 		try_switch_to(ginfo, vcpu_info, record, info) ||
-		try_switch_away(ginfo, vcpu_info, record, info);
+		try_switch_away(ginfo, vcpu_info, record, info) ||
+		try_server_block(ginfo, vcpu_info, record, info) ||
+		try_server_resume(ginfo, vcpu_info, record, info);
 	return match;
 }
 static void rt_vcpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
@@ -318,12 +454,19 @@ static void rt_vcpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot
 
 	vcpu_info->task_tid = -1;
 	vcpu_info->task_run_time = time;
-	vcpu_info->task_running = FALSE;
+	vcpu_info->task_running = TRUE;
+	vcpu_info->task_exec = TRUE;
 	vcpu_info->task_cpu = NO_CPU;
 
 	vcpu_info->server_job = -1;
 	vcpu_info->server_run_time = time;
 	vcpu_info->server_cpu = NO_CPU;
+	vcpu_info->server_running = TRUE;
+	vcpu_info->spare = TRUE;
+
+	vcpu_info->block_time = time;
+	vcpu_info->block_cpu  = NO_CPU;
+	vcpu_info->blocked    = TRUE;
 
 	vcpu_info->fresh = TRUE;
 
@@ -439,7 +582,7 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 			 nano_as_milli(vcpu_info->params.period));
 	} else {
 		/* Always running, no need to see the server */
-		vcpu->show_server = FALSE;
+		vcpu->show_server = TRUE;
 		snprintf(label, len, "%s-%d",
 			 cont->name, -vcpu_info->sid);
 	}

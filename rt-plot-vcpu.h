@@ -12,13 +12,21 @@ struct vcpu_info {
 	int			task_cpu;
 	unsigned long long	task_run_time;
 	gboolean		task_running;
+	gboolean		task_exec;
 
 	/* How the vcpu is running */
 	int			server_job;
 	int			server_cpu;
 	unsigned long long	server_run_time;
+	gboolean		server_running;
+
+	/* Server blocking */
+	unsigned long long	block_time;
+	int			block_cpu;
+	gboolean		blocked;
 
 	gboolean		fresh;
+	gboolean		spare;
 
 	/* False if we should only show what the vcpu is running, not
 	 * WHEN the CPU is running

@@ -838,7 +838,7 @@ int rt_graph_check_server_completion(struct graph_info *ginfo,
  */
 int rt_graph_check_server_block(struct graph_info *ginfo,
 				struct record *record,
-				gint *sid, gint *lid,
+				gint *sid,
 				unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -855,13 +855,11 @@ int rt_graph_check_server_block(struct graph_info *ginfo,
 		dprintf(2, "Found server_block id %d\n", event->id);
 		rtg_info->server_block_id = event->id;
 		STORE_FIELD(rtg_info, event, sblock, sid);
-		STORE_FIELD(rtg_info, event, sblock, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->server_block_id) {
 		LOAD_INT(rtg_info, record, sblock, sid, sid);
-		LOAD_INT(rtg_info, record, sblock, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
@@ -877,7 +875,7 @@ int rt_graph_check_server_block(struct graph_info *ginfo,
  */
 int rt_graph_check_server_resume(struct graph_info *ginfo,
 				 struct record *record,
-				 gint *sid, gint *lid,
+				 gint *sid,
 				 unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -894,13 +892,11 @@ int rt_graph_check_server_resume(struct graph_info *ginfo,
 		dprintf(2, "Found server_resume id %d\n", event->id);
 		rtg_info->server_resume_id = event->id;
 		STORE_FIELD(rtg_info, event, sresume, sid);
-		STORE_FIELD(rtg_info, event, sresume, lid);
 	}
 
 	id = pevent_data_type(pevent, record);
 	if (id == rtg_info->server_resume_id) {
 		LOAD_INT(rtg_info, record, sresume, sid, sid);
-		LOAD_INT(rtg_info, record, sresume, lid, lid);
 		*ts = get_rts(ginfo, record);
 
 		ret = 1;
