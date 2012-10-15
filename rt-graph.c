@@ -664,7 +664,7 @@ int rt_graph_check_server_param(struct graph_info *ginfo, struct record *record,
 int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 				    struct record *record,
 				    gint *sid, gint *job,
-				    gint *tid, gint *tjob,
+				    gint *tid, gint *tjob, gint *cpu,
 				    unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -684,6 +684,7 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 		STORE_FIELD(rtg_info, event, sswitch_to, job);
 		STORE_FIELD(rtg_info, event, sswitch_to, tid);
 		STORE_FIELD(rtg_info, event, sswitch_to, tjob);
+		STORE_FIELD(rtg_info, event, sswitch_to, cpu);
 	}
 
 	id = pevent_data_type(pevent, record);
@@ -692,6 +693,7 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 		LOAD_INT(rtg_info, record, sswitch_to, job, job);
 		LOAD_INT(rtg_info, record, sswitch_to, tid, tid);
 		LOAD_INT(rtg_info, record, sswitch_to, tjob, tjob);
+		LOAD_INT(rtg_info, record, sswitch_to, cpu, cpu);
 		*ts = get_rts(ginfo, record);
 
 		dprintf(3, "Read server_switch_to(job(%d, %d)): %d\n",
@@ -709,7 +711,7 @@ int rt_graph_check_server_switch_to(struct graph_info *ginfo,
 int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 				      struct record *record,
 				      gint *sid, gint *job,
-				      gint *tid, gint *tjob,
+				      gint *tid, gint *tjob, gint *cpu,
 				      unsigned long long *ts)
 {
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
@@ -729,6 +731,7 @@ int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 		STORE_FIELD(rtg_info, event, sswitch_away, job);
 		STORE_FIELD(rtg_info, event, sswitch_away, tid);
 		STORE_FIELD(rtg_info, event, sswitch_away, tjob);
+		STORE_FIELD(rtg_info, event, sswitch_away, cpu);
 	}
 
 	id = pevent_data_type(pevent, record);
@@ -737,6 +740,7 @@ int rt_graph_check_server_switch_away(struct graph_info *ginfo,
 		LOAD_INT(rtg_info, record, sswitch_away, job, job);
 		LOAD_INT(rtg_info, record, sswitch_away, tid, tid);
 		LOAD_INT(rtg_info, record, sswitch_away, tjob, tjob);
+		LOAD_INT(rtg_info, record, sswitch_away, tjob, cpu);
 		*ts = get_rts(ginfo, record);
 
 

@@ -71,7 +71,7 @@ static inline void try_job_update(struct server_iter_args *args, int candidate)
 
 static int server_iterator(struct graph_info *ginfo, struct record *record, void *data)
 {
-	int sid, job, tid, tjob, match, ret;
+	int sid, job, tid, tjob, match, ret, cpu;
 	struct server_iter_args *args = data;
 	unsigned long long when, time = get_rts(ginfo, record);
 
@@ -80,7 +80,7 @@ static int server_iterator(struct graph_info *ginfo, struct record *record, void
 	if (time < args->goal)
 		return 1;
 
-#define ARGS ginfo, record, &sid, &job, &tid, &tjob, &when
+#define ARGS ginfo, record, &sid, &job, &tid, &tjob, &cpu, &when
 	match = rt_graph_check_server_switch_away(ARGS);
 	if (match && sid == args->match_sid) {
 		/* We were running something */
