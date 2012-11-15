@@ -2,17 +2,6 @@
 #include "trace-graph.h"
 #include "cpu.h"
 
-#define DEBUG_LEVEL 0
-#if DEBUG_LEVEL > 0
-#define dprintf(l, x...)			\
-	do {					\
-		if (l <= DEBUG_LEVEL)		\
-			printf(x);		\
-	} while (0)
-#else
-#define dprintf(l, x...)	do { if (0) printf(x); } while (0)
-#endif
-
 /*
  * Return the next switch_away record after @time.
  */
@@ -20,17 +9,14 @@ static struct record*
 next_sa_record(struct graph_info *ginfo, struct rt_cpu_info *rtc_info,
 	       unsigned long long time, int *out_pid)
 {
-	struct pevent *pevent;
 	struct record *ret = NULL, *record;
 	struct rt_graph_info *rtg_info = &ginfo->rtg_info;
 	unsigned long long max_ts, dull;
 	int pid, dint, match;
 
 	max_ts = time + SEARCH_PERIODS * rtg_info->max_period;
-	pevent = ginfo->pevent;
 
 	set_cpu_to_rts(ginfo, time, rtc_info->cpu);
-
 	while ((record = tracecmd_read_data(ginfo->handle, rtc_info->cpu))) {
 		if (get_rts(ginfo, record) > max_ts) {
 			free_record(record);
@@ -136,7 +122,6 @@ static int get_time_info(struct graph_info *ginfo,
 	cpu = rtc_info->cpu;
 	*out_pid = *out_job = is_running = 0;
 
-	/* TODO: inneficient */
 	*out_record = find_display_record(ginfo, cpu, time);
 	record = find_record(ginfo, cpu, time);
 	if (!record)
@@ -330,9 +315,8 @@ static void rt_cpu_plot_start(struct graph_info *ginfo, struct graph_plot *plot,
 static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 			     struct record *record, struct plot_info *info)
 {
-	int pid = 0, eid, match, dint;
-	unsigned long long ts, dull;
-	char *dchar;
+	int pid = 0, eid, match;
+	unsigned long long ts;
 	struct rt_cpu_info *rtc_info = plot->private;
 
 	if (!record) {
@@ -353,19 +337,7 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 	}
 
 	if (!match) {
-		/* TODO: this should not be necessary!
-		 * Have to call checks to ensure ids are loaded. Otherwise,
-		 * is_displayed will not work here or in any other methods.
-		 */
-#define ARG ginfo,record, &pid
-		rt_graph_check_task_param(ARG, &dull, &dull) ||
-		rt_graph_check_container_param(ARG, &dchar)  ||
-		rt_graph_check_server_param(ARG, &dint, &dull, &dull) ||
-		rt_graph_check_task_release(ARG, &dint, &dull, &dull) ||
-		rt_graph_check_task_block(ARG, &dint, &dull)   ||
-		rt_graph_check_task_resume(ARG, &dint,  &dull) ||
-		rt_graph_check_any(ARG, &eid, &ts);
-#undef ARG
+		rt_graph_check_any(ginfo, record, &pid, &eid, &ts);
 
 		if (!is_displayed(ginfo, eid)) {
 			info->line = TRUE;
@@ -374,44 +346,6 @@ static int rt_cpu_plot_event(struct graph_info *ginfo, struct graph_plot *plot,
 		}
 	}
 	return 1;
-}
-
-static int
-rt_cpu_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
-			  struct trace_seq *s, unsigned long long time)
-{
-	struct rt_cpu_info *rtc_info = plot->private;
-	struct event_format *event;
-	struct record *record;
-	unsigned long long offset;
-	int eid, cpu;
-
-	/* TODO: disabled */
-	return 0;
-
-	/* cpu = rtc_info->cpu; */
-	/* record = tracecmd_peek_data(ginfo->handle, cpu); */
-	/* if (record) */
-	/* 	offset = record->offset; */
-
-	/* record = find_display_record(ginfo, cpu, time); */
-
-	/* if (offset) */
-	/* 	tracecmd_set_cursor(ginfo->handle, cpu, offset); */
-	/* if (!record) */
-	/* 	return 0; */
-
-
-	/* eid = pevent_data_type(ginfo->pevent, record); */
-	/* event = pevent_data_event_from_type(ginfo->pevent, eid); */
-	/* if (event) { */
-	/* 	trace_seq_puts(s, event->name); */
-	/* 	trace_seq_printf(s, "\n"); /\* Doesn't work otherwise *\/ */
-	/* } else */
-	/* 	trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid); */
-	/* free_record(record); */
-
-	/* return 1; */
 }
 
 struct record*
@@ -478,7 +412,6 @@ const struct plot_callbacks rt_cpu_cb = {
 	.start			= rt_cpu_plot_start,
 	.destroy		= rt_cpu_plot_destroy,
 	.plot_event		= rt_cpu_plot_event,
-	.display_last_event	= rt_cpu_plot_display_last_event,
 	.display_info		= rt_cpu_plot_display_info,
 	.match_time		= rt_cpu_plot_match_time,
 	.find_record		= rt_cpu_plot_find_record,

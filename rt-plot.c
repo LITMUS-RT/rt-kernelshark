@@ -199,41 +199,6 @@ __find_rt_record(struct graph_info *ginfo, struct rt_plot_common *rt_info,
 }
 
 /**
- * rt_plot_display_last_event - write event name at @time onto plot.
- */
-int
-rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
-			   struct trace_seq *s, unsigned long long time)
-{
-	int eid;
-	struct event_format *event;
-	struct record *record;
-	struct offset_cache *offsets;
-	struct rt_plot_common *rt_info = plot->private;
-
-	return 0;
-	/* offsets = save_offsets(ginfo); */
-
-	/* record = find_rt_display_record(ginfo, rt_info, time); */
-
-	/* restore_offsets(ginfo, offsets); */
-	/* if (!record) */
-	/* 	return 0; */
-
-	/* eid = pevent_data_type(ginfo->pevent, record); */
-	/* event = pevent_data_event_from_type(ginfo->pevent, eid); */
-	/* if (event) */
-	/* 	trace_seq_puts(s, event->name); */
-	/* else */
-	/* 	trace_seq_printf(s, "UNKNOWN EVENT %d\n", eid); */
-	/* trace_seq_putc(s, '\n'); */
-	/* trace_seq_printf(s, "CPU %d\n", record->cpu); */
-	/* free_record(record); */
-
-	/* return 1; */
-}
-
-/**
  * rt_plot_display_info - write information about @time into @s
  */
 int
@@ -250,9 +215,9 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 	/* Write plot-specific data */
 	data_record = rt_info->write_header(rt_info, ginfo, s, time);
 
-	/* Select closest relevant record */
-	range = 2 / ginfo->resolution;
 
+	/* Select closest relevant record */
+	range  = 2 / ginfo->resolution;
 	record = __find_rt_record(ginfo, rt_info, time, 1, range);
 	prev_record = find_prev_display_record(ginfo, rt_info, time, range);
 
@@ -270,6 +235,7 @@ rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 			free_record(prev_record);
 		}
 	}
+
 
 	/* Write event info */
 	if (record) {

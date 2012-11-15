@@ -1,3 +1,6 @@
+/**
+ * Plot real-time events for a single CPU.
+ */
 #ifndef __RT_PLOT_CPU_H
 #define __RT_PLOT_CPU_H
 

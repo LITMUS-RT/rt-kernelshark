@@ -1,3 +1,6 @@
+/**
+ * Plot real-time events for a single container.
+ */
 #ifndef __RT_PLOT_CONTAINER_H
 #define __RT_PLOT_CONTAINER_H
 

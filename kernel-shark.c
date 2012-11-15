@@ -1933,64 +1933,64 @@ void kernel_shark(int argc, char **argv)
 	menu = gtk_menu_new();    /* Don't need to show menus */
 
 
-	/* --- File - Load Option --- */
+	/* /\* --- File - Load Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("Load data");
+	/* sub_item = gtk_menu_item_new_with_label("Load data"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (load_clicked),
-				  (gpointer) info);
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (load_clicked), */
+	/* 			  (gpointer) info); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
-
-
-	/* --- File - Load Filter --- */
-
-	sub_item = gtk_menu_item_new_with_label("Load filter");
-
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
-
-	info->load_filter_menu = sub_item;
-
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
-
-	update_load_filter(info);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
-	/* --- File - Save Filter Option --- */
+	/* /\* --- File - Load Filter --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("Save filter");
+	/* sub_item = gtk_menu_item_new_with_label("Load filter"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* info->load_filter_menu = sub_item; */
 
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (save_filter_clicked),
-				  (gpointer) info);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
+
+	/* update_load_filter(info); */
 
 
-	/* --- File - Export Filter Option --- */
+	/* /\* --- File - Save Filter Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("Export filters");
+	/* sub_item = gtk_menu_item_new_with_label("Save filter"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (export_filters_clicked),
-				  (gpointer) info);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (save_filter_clicked), */
+	/* 			  (gpointer) info); */
+
+
+	/* /\* --- File - Export Filter Option --- *\/ */
+
+	/* sub_item = gtk_menu_item_new_with_label("Export filters"); */
+
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
+
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (export_filters_clicked), */
+	/* 			  (gpointer) info); */
+
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 	/* --- File - Quit Option --- */
 
@@ -2011,213 +2011,213 @@ void kernel_shark(int argc, char **argv)
 
 	/* --- end File options --- */
 
-	/* --- Filter Option --- */
+	/* /\* --- Filter Option --- *\/ */
 
-	menu_item = gtk_menu_item_new_with_label("Filter");
-	gtk_widget_show(menu_item);
+	/* menu_item = gtk_menu_item_new_with_label("Filter"); */
+	/* gtk_widget_show(menu_item); */
 
-	gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item);
+	/* gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item); */
 
-	menu = gtk_menu_new();    /* Don't need to show menus */
+	/* menu = gtk_menu_new();    /\* Don't need to show menus *\/ */
 
 
 
-	/* --- Filter - Sync task Option --- */
+	/* /\* --- Filter - Sync task Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("Unsync Graph and List Task Filters");
+	/* sub_item = gtk_menu_item_new_with_label("Unsync Graph and List Task Filters"); */
 
-	info->task_sync_menu = sub_item;
+	/* info->task_sync_menu = sub_item; */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect (G_OBJECT (sub_item), "activate",
-			  G_CALLBACK (sync_task_filter_clicked),
-			  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect (G_OBJECT (sub_item), "activate", */
+	/* 		  G_CALLBACK (sync_task_filter_clicked), */
+	/* 		  (gpointer) info); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
-	/* --- Filter - Sync events Option --- */
+	/* /\* --- Filter - Sync events Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("Unsync Graph and List Event Filters");
+	/* sub_item = gtk_menu_item_new_with_label("Unsync Graph and List Event Filters"); */
 
-	info->events_sync_menu = sub_item;
+	/* info->events_sync_menu = sub_item; */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect (G_OBJECT (sub_item), "activate",
-			  G_CALLBACK (sync_events_filter_clicked),
-			  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect (G_OBJECT (sub_item), "activate", */
+	/* 		  G_CALLBACK (sync_events_filter_clicked), */
+	/* 		  (gpointer) info); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
 
 
-	/* --- Filter - Graph Tasks Option --- */
+	/* /\* --- Filter - Graph Tasks Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("tasks");
+	/* sub_item = gtk_menu_item_new_with_label("tasks"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (graph_tasks_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (graph_tasks_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->graph_task_menu = sub_item;
+	/* info->graph_task_menu = sub_item; */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
-	/* --- Filter - Graph Hide Tasks Option --- */
+	/* /\* --- Filter - Graph Hide Tasks Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("hide tasks");
+	/* sub_item = gtk_menu_item_new_with_label("hide tasks"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (graph_hide_tasks_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (graph_hide_tasks_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->graph_hide_task_menu = sub_item;
+	/* info->graph_hide_task_menu = sub_item; */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
 
-	/* --- Filter - Events Option --- */
+	/* /\* --- Filter - Events Option --- *\/ */
 
-	/* The list and graph events start off insync */
-	sub_item = gtk_menu_item_new_with_label("events");
+	/* /\* The list and graph events start off insync *\/ */
+	/* sub_item = gtk_menu_item_new_with_label("events"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (graph_events_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (graph_events_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->graph_events_menu = sub_item;
+	/* info->graph_events_menu = sub_item; */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
-	/* --- Filter - Graph Advanced Events Option --- */
+	/* /\* --- Filter - Graph Advanced Events Option --- *\/ */
 
-	/* The list and graph events start off in sync */
-	sub_item = gtk_menu_item_new_with_label("advanced events");
+	/* /\* The list and graph events start off in sync *\/ */
+	/* sub_item = gtk_menu_item_new_with_label("advanced events"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (adv_graph_filter_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (adv_graph_filter_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->graph_adv_events_menu = sub_item;
+	/* info->graph_adv_events_menu = sub_item; */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
-	/* --- Filter - List Tasks Option --- */
+	/* /\* --- Filter - List Tasks Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("list tasks");
+	/* sub_item = gtk_menu_item_new_with_label("list tasks"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (list_tasks_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (list_tasks_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->list_task_menu = sub_item;
+	/* info->list_task_menu = sub_item; */
 
-	/* Only show this item when list and graph tasks are not synced */
+	/* /\* Only show this item when list and graph tasks are not synced *\/ */
 
 
-	/* --- Filter - List Hide Tasks Option --- */
+	/* /\* --- Filter - List Hide Tasks Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("list hide tasks");
+	/* sub_item = gtk_menu_item_new_with_label("list hide tasks"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (list_hide_tasks_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (list_hide_tasks_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->list_hide_task_menu = sub_item;
+	/* info->list_hide_task_menu = sub_item; */
 
-	/* Only show this item when list and graph tasks are not synced */
+	/* /\* Only show this item when list and graph tasks are not synced *\/ */
 
-	/* --- Filter - List Events Option --- */
+	/* /\* --- Filter - List Events Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("list events");
+	/* sub_item = gtk_menu_item_new_with_label("list events"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (list_events_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (list_events_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->list_events_menu = sub_item;
+	/* info->list_events_menu = sub_item; */
 
-	/* We do not show this menu (yet) */
+	/* /\* We do not show this menu (yet) *\/ */
 
 
-	/* --- Filter - List Advanced Events Option --- */
+	/* /\* --- Filter - List Advanced Events Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("list advanced event");
+	/* sub_item = gtk_menu_item_new_with_label("list advanced event"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (adv_list_filter_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (adv_list_filter_clicked), */
+	/* 			  (gpointer) info); */
 
-	info->list_adv_events_menu = sub_item;
-	/* We do not show this menu (yet) */
+	/* info->list_adv_events_menu = sub_item; */
+	/* /\* We do not show this menu (yet) *\/ */
 
 
-	/* --- Filter - CPUs Option --- */
+	/* /\* --- Filter - CPUs Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("list CPUs");
+	/* sub_item = gtk_menu_item_new_with_label("list CPUs"); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (cpus_clicked),
-				  (gpointer) info);
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (cpus_clicked), */
+	/* 			  (gpointer) info); */
 
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
 
-	/* --- End Filter Options --- */
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu);
+	/* /\* --- End Filter Options --- *\/ */
+	/* gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu); */
 
 
 	/* --- Plot Option --- */
@@ -2328,80 +2328,80 @@ void kernel_shark(int argc, char **argv)
 
 
 
-	/* --- Capture Option --- */
+	/* /\* --- Capture Option --- *\/ */
 
-	menu_item = gtk_menu_item_new_with_label("Capture");
-	gtk_widget_show(menu_item);
+	/* menu_item = gtk_menu_item_new_with_label("Capture"); */
+	/* gtk_widget_show(menu_item); */
 
-	gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item);
+	/* gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item); */
 
-	menu = gtk_menu_new();    /* Don't need to show menus */
-
-
-
-	/* --- Capture - Record Option --- */
-
-	sub_item = gtk_menu_item_new_with_label("Record");
-
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
-
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (tracecmd_capture_clicked),
-				  (gpointer) info);
-
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
-
-	/* --- End Capture Options --- */
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu);
+	/* menu = gtk_menu_new();    /\* Don't need to show menus *\/ */
 
 
-	/* --- Help Option --- */
 
-	menu_item = gtk_menu_item_new_with_label("Help");
-	gtk_widget_show(menu_item);
+	/* /\* --- Capture - Record Option --- *\/ */
 
-	gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item);
+	/* sub_item = gtk_menu_item_new_with_label("Record"); */
 
-	menu = gtk_menu_new();    /* Don't need to show menus */
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
 
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (tracecmd_capture_clicked), */
+	/* 			  (gpointer) info); */
 
-	/* --- Help - Contents Option --- */
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
 
-	sub_item = gtk_menu_item_new_with_label("Contents");
-
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
-
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (help_content_clicked),
-				  (gpointer) info);
-
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* /\* --- End Capture Options --- *\/ */
+	/* gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu); */
 
 
-	/* --- Help - About Option --- */
+	/* /\* --- Help Option --- *\/ */
 
-	sub_item = gtk_menu_item_new_with_label("About");
+	/* menu_item = gtk_menu_item_new_with_label("Help"); */
+	/* gtk_widget_show(menu_item); */
 
-	/* Add them to the menu */
-	gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item);
+	/* gtk_menu_bar_append(GTK_MENU_BAR (menu_bar), menu_item); */
 
-	/* We can attach the Quit menu item to our exit function */
-	g_signal_connect_swapped (G_OBJECT (sub_item), "activate",
-				  G_CALLBACK (help_about_clicked),
-				  (gpointer) info);
-
-	/* We do need to show menu items */
-	gtk_widget_show(sub_item);
+	/* menu = gtk_menu_new();    /\* Don't need to show menus *\/ */
 
 
-	/* --- End Help Options --- */
-	gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu);
+	/* /\* --- Help - Contents Option --- *\/ */
+
+	/* sub_item = gtk_menu_item_new_with_label("Contents"); */
+
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
+
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (help_content_clicked), */
+	/* 			  (gpointer) info); */
+
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
+
+
+	/* /\* --- Help - About Option --- *\/ */
+
+	/* sub_item = gtk_menu_item_new_with_label("About"); */
+
+	/* /\* Add them to the menu *\/ */
+	/* gtk_menu_shell_append(GTK_MENU_SHELL (menu), sub_item); */
+
+	/* /\* We can attach the Quit menu item to our exit function *\/ */
+	/* g_signal_connect_swapped (G_OBJECT (sub_item), "activate", */
+	/* 			  G_CALLBACK (help_about_clicked), */
+	/* 			  (gpointer) info); */
+
+	/* /\* We do need to show menu items *\/ */
+	/* gtk_widget_show(sub_item); */
+
+
+	/* /\* /\\* --- End Help Options --- *\\/ *\/ */
+	/* gtk_menu_item_set_submenu(GTK_MENU_ITEM (menu_item), menu); */
 
 
 	/* --- Top Level Vpaned --- */

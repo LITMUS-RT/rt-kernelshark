@@ -32,13 +32,6 @@ static void update_server_label(struct vcpu_info *info, int job)
 	}
 }
 
-#define check_server(cond, vcpu, time, fmt, args...)			\
-	do {								\
-		if (!(cond)) fprintf(stderr, "%s -> %s: " fmt " at %llu\n", \
-				     vcpu->server_label,		\
-				     vcpu_info->task_label, ##args, time); \
-	} while(0)
-
 static int
 try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		struct record *record, struct plot_info *info)
@@ -53,11 +46,6 @@ try_server_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 		/* This server is no longer running something */
 		update_task_label(vcpu_info, tid, tjob);
 		update_server_label(vcpu_info, job);
-
-		check_server(vcpu_info->server_running, vcpu_info, ts,
-			     "switched away when server was not running");
-		check_server(vcpu_info->task_running, vcpu_info, ts,
-			     "switched away when no task was running");
 
 		if (vcpu_info->task_run_time && vcpu_info->task_run_time < ts) {
 			info->box = TRUE;
@@ -127,16 +115,9 @@ static int try_server_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu
 	match = rt_graph_check_server_switch_to(ginfo, record,
 						&sid, &job, &tid, &tjob, &cpu, &ts);
 	if (match && sid == vcpu_info->sid) {
-		update_server_label(vcpu_info, job);
-		check_server(!vcpu_info->task_running || vcpu_info->task_cpu == NO_CPU, vcpu_info, ts,
-			     "started running %d:%d while another task ran",
-			     tid, tjob);
-
 		/* This server is now running something */
+		update_server_label(vcpu_info, job);
 		update_task_label(vcpu_info, tid, tjob);
-
-		check_server(vcpu_info->server_running, vcpu_info, ts,
-			     "started running task without running server");
 
 		vcpu_info->task_run_time = ts;
 		vcpu_info->task_cpu = sid;
@@ -204,9 +185,6 @@ static int try_switch_to(struct graph_info *ginfo, struct vcpu_info *vcpu_info,
 
 		vcpu_info->task_run_time = ts;
 		ret = 1;
-	} else if (pid) {
-		check_server(pid != vcpu_info->sid, vcpu_info, ts,
-			     "server missing its task %d:%d, run time: %llu", pid, job, vcpu_info->task_run_time);
 	}
 
 	if (ret) {
@@ -245,10 +223,8 @@ static int try_switch_away(struct graph_info *ginfo, struct vcpu_info *vcpu_info
 
 		vcpu_info->task_run_time = ts;
 		ret = 1;
-	} else {
-		check_server(pid != vcpu_info->sid, vcpu_info, ts,
-			     "server missing its task switch away %d:%d, exec: %d", pid, job, vcpu_info->task_exec);
 	}
+
 	if (ret) {
 		dprintf(3, "Switch away on VCPU %d for %d:%d at %llu\n",
 			vcpu_info->sid, pid, job, ts);
@@ -264,12 +240,6 @@ static int try_server_block(struct graph_info *ginfo, struct vcpu_info *vcpu_inf
 
 	match = rt_graph_check_server_block(ginfo, record, &sid, &ts);
 	if (match && sid == vcpu_info->sid) {
-		check_server(!vcpu_info->blocked || vcpu_info->block_cpu == NO_CPU,
-			     vcpu_info, ts, "already blocked");
-		check_server(!vcpu_info->server_running || vcpu_info->server_cpu == NO_CPU,
-			     vcpu_info, ts,
-			     "blocked before running stopped");
-
 		vcpu_info->fresh = FALSE;
 		vcpu_info->block_time = ts;
 		vcpu_info->block_cpu = record->cpu;
@@ -294,9 +264,6 @@ static int try_server_resume(struct graph_info *ginfo, struct vcpu_info *vcpu_in
 
 	match = rt_graph_check_server_resume(ginfo, record, &sid, &ts);
 	if (match && sid == vcpu_info->sid) {
-		check_server(vcpu_info->blocked, vcpu_info, ts,
-			     "resuming when not blocked");
-
 		info->box = TRUE;
 		info->bcolor = 0x0;
 		info->bfill = TRUE;
@@ -560,7 +527,6 @@ const struct plot_callbacks rt_vcpu_cb = {
 	.start			= rt_vcpu_plot_start,
 	.destroy		= rt_vcpu_plot_destroy,
 	.plot_event		= rt_vcpu_plot_event,
-	.display_last_event	= rt_plot_display_last_event,
 	.display_info		= rt_plot_display_info,
 	.match_time		= rt_plot_match_time,
 	.find_record		= rt_plot_find_record,
@@ -597,7 +563,7 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 			 nano_as_milli(vcpu_info->params.period));
 	} else {
 		/* Always running, no need to see the server */
-		vcpu->show_server = TRUE;
+		vcpu->show_server = FALSE;
 		snprintf(label, len, "%s-%d",
 			 cont->name, -vcpu_info->sid);
 	}

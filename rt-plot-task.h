@@ -1,3 +1,6 @@
+/**
+ * Plot real-time events for a single task.
+ */
 #ifndef __RT_PLOT_TASK_H
 #define __RT_PLOT_TASK_H
 

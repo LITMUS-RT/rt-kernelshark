@@ -1,3 +1,6 @@
+/**
+ * Plot real-time events for a single virtual CPU of a container.
+ */
 #include "trace-graph.h"
 
 struct vcpu_list;

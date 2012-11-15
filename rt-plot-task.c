@@ -535,7 +535,6 @@ const struct plot_callbacks rt_task_cb = {
 	.start			= rt_task_plot_start,
 	.destroy		= rt_task_plot_destroy,
 	.plot_event		= rt_task_plot_event,
-	.display_last_event	= rt_plot_display_last_event,
 	.display_info		= rt_plot_display_info,
 	.match_time		= rt_plot_match_time,
 	.find_record		= rt_plot_find_record,

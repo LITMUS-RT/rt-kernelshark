@@ -1,3 +1,6 @@
+/**
+ * Common functionality for all real-time plots.
+ */
 #ifndef __RT_PLOT_H
 #define __RT_PLOT_H
 
@@ -26,7 +29,6 @@ struct job_info {
 	unsigned long long	no;
 };
 
-
 struct rt_plot_common {
 	record_matches_cb 	record_matches;
 	is_drawn_cb		is_drawn;
@@ -38,10 +40,6 @@ struct rt_plot_common {
 	struct job_info		last_job;
 };
 
-
-int
-rt_plot_display_last_event(struct graph_info *ginfo, struct graph_plot *plot,
-			   struct trace_seq *s, unsigned long long time);
 int
 rt_plot_display_info(struct graph_info *ginfo, struct graph_plot *plot,
 		     struct trace_seq *s, unsigned long long time);
