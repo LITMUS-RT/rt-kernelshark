@@ -80,7 +80,7 @@ void free_task_hash(struct task_list **tasks)
 gint *task_list_pids(struct task_list **tasks)
 {
 	struct task_list *list;
-	gint *pids;
+	gint *pids = 0;
 	gint count = 0;
 	gint i;
 

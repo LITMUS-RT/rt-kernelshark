@@ -563,7 +563,7 @@ void insert_vcpu(struct graph_info *ginfo, struct cont_list *cont,
 			 nano_as_milli(vcpu_info->params.period));
 	} else {
 		/* Always running, no need to see the server */
-		vcpu->show_server = FALSE;
+		vcpu->show_server = TRUE;
 		snprintf(label, len, "%s-%d",
 			 cont->name, -vcpu_info->sid);
 	}
